@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react'
 import {
-  ChevronRight, ChevronLeft, Mic, FileText, CheckCircle,
-  Loader, AlertCircle, Edit3, Users
+  ChevronRight, ChevronLeft, CheckCircle,
+  Loader, AlertCircle, Edit3, Users, Lightbulb
 } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { AudioRecorder } from './AudioRecorder'
+import { IntakeGuide } from './IntakeGuide'
 import { useAuth } from '../../hooks/useAuth'
 import { getClients, createSession } from '../../utils/supabase'
-import { transcribeAudio, generateNote } from '../../utils/openai'
-import { getOpenAIKey } from '../../utils/openai'
+import { transcribeAudio, generateNote, generateSessionFeedback, getOpenAIKey } from '../../utils/openai'
 import toast from 'react-hot-toast'
 
-const STEPS = ['Client & Mode', 'Record Audio', 'Review Transcription', 'Review Note']
+const STEPS = ['Client & Mode', 'Record Audio', 'Transcription', 'AI Feedback', 'SOAP Note']
 
 export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) {
   const { user } = useAuth()
@@ -22,6 +22,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
   const [audioBlob, setAudioBlob] = useState(null)
   const [transcription, setTranscription] = useState('')
   const [editingTranscription, setEditingTranscription] = useState(false)
+  const [aiFeedback, setAiFeedback] = useState('')
   const [soapNote, setSoapNote] = useState(null)
   const [processing, setProcessing] = useState(false)
   const [processingMsg, setProcessingMsg] = useState('')
@@ -76,6 +77,27 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
     }
 
     if (step === 2) {
+      // Generate AI feedback
+      if (!apiKey) {
+        setError('OpenAI API key not configured.')
+        return
+      }
+      setProcessing(true)
+      setProcessingMsg('Analyzing session with GPT-4...')
+      try {
+        const feedback = await generateSessionFeedback(transcription, mode, selectedClient, apiKey)
+        setAiFeedback(feedback)
+        setStep(3)
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setProcessing(false)
+        setProcessingMsg('')
+      }
+      return
+    }
+
+    if (step === 3) {
       // Generate SOAP note
       if (!apiKey) {
         setError('OpenAI API key not configured.')
@@ -86,7 +108,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
       try {
         const note = await generateNote(transcription, mode, selectedClient, null, apiKey)
         setSoapNote(note)
-        setStep(3)
+        setStep(4)
       } catch (err) {
         setError(err.message)
       } finally {
@@ -108,6 +130,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
         mode,
         session_date: new Date().toISOString(),
         transcription,
+        ai_feedback: aiFeedback || null,
         ...soapNote,
       })
       onComplete(session)
@@ -203,15 +226,16 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
           </div>
         )}
 
-        {/* Step 1: Record audio */}
+        {/* Step 1: Record audio + Intake Guide */}
         {step === 1 && (
-          <div>
-            <p className="text-sm text-text-secondary mb-3">
+          <div className="space-y-3">
+            <p className="text-sm text-text-secondary">
               Record your session with{' '}
               <span className="text-text-primary font-medium">{selectedClient?.name}</span>.
               Audio is saved locally and never stored in the cloud.
             </p>
             <AudioRecorder onRecordingComplete={setAudioBlob} />
+            <IntakeGuide />
           </div>
         )}
 
@@ -219,7 +243,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
         {step === 2 && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-text-secondary">Review and edit the transcription before generating the note.</p>
+              <p className="text-sm text-text-secondary">Review and edit the transcription before generating feedback.</p>
               <Button
                 variant="ghost"
                 size="xs"
@@ -245,11 +269,41 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
           </div>
         )}
 
-        {/* Step 3: Review generated SOAP note */}
-        {step === 3 && soapNote && (
+        {/* Step 3: AI Feedback */}
+        {step === 3 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Lightbulb className="w-3.5 h-3.5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-text-primary">AI Session Feedback</p>
+                <p className="text-xs text-text-muted">Follow-up questions to clarify the patient's presenting problem</p>
+              </div>
+            </div>
+
+            {aiFeedback ? (
+              <div className="space-y-2">
+                <div className="card-2 p-4 max-h-64 overflow-y-auto">
+                  <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">{aiFeedback}</p>
+                </div>
+                <p className="text-[11px] text-text-muted">
+                  This feedback will be saved with the session and included in staffing documents.
+                </p>
+              </div>
+            ) : (
+              <div className="card-2 p-6 text-center text-text-muted text-sm">
+                No feedback generated yet.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Step 4: Review generated SOAP note */}
+        {step === 4 && soapNote && (
           <div className="space-y-3">
             <p className="text-sm text-text-secondary">Review and edit the generated SOAP note before saving.</p>
-            {(['subjective', 'objective', 'assessment', 'plan'] ).map(section => (
+            {(['subjective', 'objective', 'assessment', 'plan']).map(section => (
               <div key={section} className="space-y-1">
                 <label className="form-label">{section.charAt(0).toUpperCase() + section.slice(1)}</label>
                 <textarea
@@ -292,7 +346,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
           {step === 0 ? 'Cancel' : 'Back'}
         </Button>
 
-        {step === 3 ? (
+        {step === 4 ? (
           <Button variant="primary" size="sm" loading={saving} onClick={handleSave} icon={CheckCircle}>
             Save Session Note
           </Button>
@@ -305,7 +359,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
             loading={processing}
             iconRight={ChevronRight}
           >
-            {step === 1 ? 'Transcribe' : step === 2 ? 'Generate Note' : 'Next'}
+            {step === 1 ? 'Transcribe' : step === 2 ? 'Analyze with AI' : step === 3 ? 'Generate Note' : 'Next'}
           </Button>
         )}
       </div>

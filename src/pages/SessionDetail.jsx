@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Download, FileText, Edit3, Check, X, Shield, Stethoscope } from 'lucide-react'
+import { ArrowLeft, Download, FileText, Edit3, Check, X, Shield, Stethoscope, Lightbulb } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { Button } from '../components/ui/Button'
 import { ModeBadge } from '../components/ui/Badge'
@@ -151,6 +151,20 @@ export default function SessionDetail() {
           />
         ))}
       </div>
+
+      {/* AI Feedback */}
+      {session.ai_feedback && (
+        <div className="mt-5 rounded-xl border border-primary/30 bg-primary/5 overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-primary/20">
+            <Lightbulb className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+            <span className="text-xs font-semibold text-primary">AI Session Feedback</span>
+            <span className="text-[10px] text-primary/50 ml-1">— follow-up questions &amp; clinical observations</span>
+          </div>
+          <div className="px-4 py-3 max-h-64 overflow-y-auto">
+            <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap">{session.ai_feedback}</p>
+          </div>
+        </div>
+      )}
 
       {/* Transcription (collapsible) */}
       {session.transcription && (

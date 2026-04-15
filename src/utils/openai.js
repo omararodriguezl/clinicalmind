@@ -101,6 +101,74 @@ export async function generateStaffingDocument(clientInfo, sessions, mode, custo
   return data.choices[0].message.content
 }
 
+// ── Session Feedback (AI Follow-up Questions) ─────────────────────────────────
+
+export async function generateSessionFeedback(transcription, mode, clientInfo, apiKey) {
+  const key = apiKey || getOpenAIKey()
+  if (!key) throw new Error('OpenAI API key not configured. Go to Settings to add your key.')
+
+  const modeContext =
+    mode === 'army'
+      ? 'a US Army 68X Mental Health Specialist conducting a behavioral health assessment on a service member'
+      : 'a behavioral health RBT/clinician conducting a session with a civilian client'
+
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a clinical supervision AI assistant helping ${modeContext}.
+Your job is to review a session transcription and identify gaps — things that were not explored enough to fully understand the patient's presenting problem.
+Provide 5–8 specific follow-up questions the clinician should ask in future sessions to clarify the problem, explore missed areas, or gather critical information.
+Format your response as:
+
+CLINICAL OBSERVATIONS:
+[2–3 sentences summarizing what was covered and the overall clinical picture]
+
+GAPS IDENTIFIED:
+[bullet list of areas not adequately explored]
+
+RECOMMENDED FOLLOW-UP QUESTIONS:
+1. [question]
+2. [question]
+...
+
+Keep questions direct, open-ended, and clinically relevant.`,
+        },
+        {
+          role: 'user',
+          content: `Client ID: ${clientInfo.client_id_number}
+Diagnosis: ${clientInfo.diagnosis || 'Not yet specified'}
+${mode === 'army' ? `Rank/Unit: ${clientInfo.rank || 'N/A'} / ${clientInfo.unit || 'N/A'}` : ''}
+
+Session Transcription:
+---
+${transcription}
+---
+
+Please analyze this session and provide follow-up questions to better understand the patient's presenting problem.`,
+        },
+      ],
+      temperature: 0.4,
+      max_tokens: 1200,
+    }),
+  })
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}))
+    throw new Error(err?.error?.message || `GPT-4 API error: ${response.status}`)
+  }
+
+  const data = await response.json()
+  return data.choices[0].message.content
+}
+
 // ── DSM-5 Query ───────────────────────────────────────────────────────────────
 
 export async function queryDSM(question, apiKey) {
@@ -215,7 +283,7 @@ Session ${i + 1} (${new Date(s.session_date).toLocaleDateString()}):
 Subjective: ${s.soap_subjective || 'N/A'}
 Objective: ${s.soap_objective || 'N/A'}
 Assessment: ${s.soap_assessment || 'N/A'}
-Plan: ${s.soap_plan || 'N/A'}`
+Plan: ${s.soap_plan || 'N/A'}${s.ai_feedback ? `\nAI Follow-up Recommendations: ${s.ai_feedback}` : ''}`
     )
     .join('\n---')
 
