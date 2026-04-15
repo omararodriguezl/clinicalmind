@@ -10,6 +10,7 @@ import { ModeBadge, SafetyBadge } from '../components/ui/Badge'
 import { Modal } from '../components/ui/Modal'
 import { PageLoader } from '../components/ui/LoadingSpinner'
 import { ClientForm } from '../components/clients/ClientForm'
+import { NewSessionWizard } from '../components/recording/NewSessionWizard'
 import { getClient, getSessions, getActiveSafetyPlan } from '../utils/supabase'
 import { useClients } from '../hooks/useClients'
 import toast from 'react-hot-toast'
@@ -24,6 +25,7 @@ export default function ClientDetail() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showWizard, setShowWizard] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -45,6 +47,12 @@ export default function ClientDetail() {
     }
     load()
   }, [id, navigate])
+
+  const handleSessionCreated = (newSession) => {
+    setShowWizard(false)
+    setSessions(prev => [newSession, ...prev])
+    toast.success('Session note saved')
+  }
 
   const handleEdit = async (data) => {
     setSaving(true)
@@ -137,17 +145,29 @@ export default function ClientDetail() {
 
       {/* Action buttons */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
-        <Link to={`/sessions?client=${id}`}>
-          <Button variant="secondary" size="sm" icon={Mic} className="w-full">New Session</Button>
-        </Link>
+        <Button variant="secondary" size="sm" icon={Mic} className="w-full" onClick={() => setShowWizard(true)}>
+          New Session
+        </Button>
         <Link to={`/safety?client=${id}`}>
           <Button variant="secondary" size="sm" icon={ShieldAlert} className="w-full">Safety Plan</Button>
         </Link>
         <Link to={`/staffing?client=${id}`}>
           <Button variant="secondary" size="sm" icon={ClipboardList} className="w-full">Staffing</Button>
         </Link>
-        <Button variant="ghost" size="sm" icon={FileText} className="w-full">Export</Button>
+        <Link to={`/sessions`}>
+          <Button variant="ghost" size="sm" icon={FileText} className="w-full">All Sessions</Button>
+        </Link>
       </div>
+
+      {/* Active safety plan notice */}
+      {safetyPlan && (
+        <Link to={`/safety?client=${id}`}>
+          <div className="flex items-center gap-2 px-3 py-2.5 mb-4 rounded-lg bg-danger-muted/20 border border-red-800/50 hover:border-red-700 transition-colors">
+            <ShieldAlert className="w-3.5 h-3.5 text-danger flex-shrink-0" />
+            <span className="text-xs text-danger font-medium">Active Safety Plan — tap to view</span>
+          </div>
+        </Link>
+      )}
 
       {/* Sessions */}
       <div>
@@ -155,9 +175,7 @@ export default function ClientDetail() {
           <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
             Sessions ({sessions.length})
           </h3>
-          <Link to={`/sessions?client=${id}`}>
-            <Button variant="ghost" size="xs" icon={Plus}>New</Button>
-          </Link>
+          <Button variant="ghost" size="xs" icon={Plus} onClick={() => setShowWizard(true)}>New</Button>
         </div>
         {sessions.length === 0 ? (
           <div className="card p-6 text-center text-sm text-text-muted">
@@ -196,6 +214,21 @@ export default function ClientDetail() {
           </div>
         </div>
       )}
+
+      {/* New Session Wizard modal */}
+      <Modal
+        isOpen={showWizard}
+        onClose={() => setShowWizard(false)}
+        title="New Session"
+        size="lg"
+        className="!max-h-[95dvh]"
+      >
+        <NewSessionWizard
+          preselectedClientId={id}
+          onComplete={handleSessionCreated}
+          onCancel={() => setShowWizard(false)}
+        />
+      </Modal>
 
       {/* Edit modal */}
       <Modal isOpen={editing} onClose={() => setEditing(false)} title="Edit Client" size="md">

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   ChevronRight, ChevronLeft, CheckCircle,
-  Loader, AlertCircle, Edit3, Users, Lightbulb
+  Loader, AlertCircle, Edit3, Users, Lightbulb, Mic, ChevronDown, ChevronUp
 } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { AudioRecorder } from './AudioRecorder'
@@ -19,11 +19,24 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
   const [clients, setClients] = useState([])
   const [selectedClient, setSelectedClient] = useState(null)
   const [mode, setMode] = useState('civilian')
+
+  // Initial recording
   const [audioBlob, setAudioBlob] = useState(null)
   const [transcription, setTranscription] = useState('')
   const [editingTranscription, setEditingTranscription] = useState(false)
+
+  // AI feedback
   const [aiFeedback, setAiFeedback] = useState('')
+
+  // Follow-up recording (after feedback)
+  const [showFollowUp, setShowFollowUp] = useState(false)
+  const [followUpAudioBlob, setFollowUpAudioBlob] = useState(null)
+  const [followUpTranscription, setFollowUpTranscription] = useState('')
+  const [transcribingFollowUp, setTranscribingFollowUp] = useState(false)
+
+  // SOAP note
   const [soapNote, setSoapNote] = useState(null)
+
   const [processing, setProcessing] = useState(false)
   const [processingMsg, setProcessingMsg] = useState('')
   const [error, setError] = useState(null)
@@ -35,10 +48,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
       setClients(data)
       if (preselectedClientId) {
         const c = data.find(c => c.id === preselectedClientId)
-        if (c) {
-          setSelectedClient(c)
-          setMode(c.mode)
-        }
+        if (c) { setSelectedClient(c); setMode(c.mode) }
       }
     })
   }, [user, preselectedClientId])
@@ -52,15 +62,26 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
     return true
   }
 
+  const handleTranscribeFollowUp = async () => {
+    if (!followUpAudioBlob || !apiKey) return
+    setTranscribingFollowUp(true)
+    setError(null)
+    try {
+      const text = await transcribeAudio(followUpAudioBlob, apiKey)
+      setFollowUpTranscription(text)
+      setShowFollowUp(false)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setTranscribingFollowUp(false)
+    }
+  }
+
   const handleNext = async () => {
     setError(null)
 
     if (step === 1) {
-      // Transcribe audio
-      if (!apiKey) {
-        setError('OpenAI API key not configured. Go to Settings to add your key.')
-        return
-      }
+      if (!apiKey) { setError('OpenAI API key not configured. Go to Settings to add your key.'); return }
       setProcessing(true)
       setProcessingMsg('Transcribing audio with Whisper...')
       try {
@@ -77,11 +98,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
     }
 
     if (step === 2) {
-      // Generate AI feedback
-      if (!apiKey) {
-        setError('OpenAI API key not configured.')
-        return
-      }
+      if (!apiKey) { setError('OpenAI API key not configured.'); return }
       setProcessing(true)
       setProcessingMsg('Analyzing session with GPT-4...')
       try {
@@ -98,15 +115,15 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
     }
 
     if (step === 3) {
-      // Generate SOAP note
-      if (!apiKey) {
-        setError('OpenAI API key not configured.')
-        return
-      }
+      if (!apiKey) { setError('OpenAI API key not configured.'); return }
       setProcessing(true)
       setProcessingMsg('Generating SOAP note with GPT-4...')
       try {
-        const note = await generateNote(transcription, mode, selectedClient, null, apiKey)
+        // Combine initial + follow-up transcriptions if follow-up exists
+        const combined = followUpTranscription
+          ? `[INITIAL SESSION]\n${transcription}\n\n[FOLLOW-UP QUESTIONS — after AI feedback]\n${followUpTranscription}`
+          : transcription
+        const note = await generateNote(combined, mode, selectedClient, null, apiKey)
         setSoapNote(note)
         setStep(4)
       } catch (err) {
@@ -129,7 +146,9 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
         client_id: selectedClient.id,
         mode,
         session_date: new Date().toISOString(),
-        transcription,
+        transcription: followUpTranscription
+          ? `[INITIAL]\n${transcription}\n\n[FOLLOW-UP]\n${followUpTranscription}`
+          : transcription,
         ai_feedback: aiFeedback || null,
         ...soapNote,
       })
@@ -193,28 +212,26 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
                 </div>
               ) : (
                 <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
-                  {clients
-                    .filter(c => c.mode === mode)
-                    .map(client => (
-                      <button
-                        key={client.id}
-                        onClick={() => setSelectedClient(client)}
-                        className={`w-full text-left p-3 rounded-lg border transition-all ${
-                          selectedClient?.id === client.id
-                            ? mode === 'army' ? 'bg-army-muted border-army-border text-army-text' : 'bg-civilian-muted border-civilian-border text-civilian-text'
-                            : 'bg-surface-2 border-border hover:border-border-light text-text-primary'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Users className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
-                          <span className="text-sm font-medium">{client.name}</span>
-                          <span className="text-xs opacity-60 font-mono ml-auto">#{client.client_id_number}</span>
-                        </div>
-                        {client.diagnosis && (
-                          <div className="text-xs opacity-60 mt-0.5 ml-5">{client.diagnosis}</div>
-                        )}
-                      </button>
-                    ))}
+                  {clients.filter(c => c.mode === mode).map(client => (
+                    <button
+                      key={client.id}
+                      onClick={() => setSelectedClient(client)}
+                      className={`w-full text-left p-3 rounded-lg border transition-all ${
+                        selectedClient?.id === client.id
+                          ? mode === 'army' ? 'bg-army-muted border-army-border text-army-text' : 'bg-civilian-muted border-civilian-border text-civilian-text'
+                          : 'bg-surface-2 border-border hover:border-border-light text-text-primary'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Users className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
+                        <span className="text-sm font-medium">{client.name}</span>
+                        <span className="text-xs opacity-60 font-mono ml-auto">#{client.client_id_number}</span>
+                      </div>
+                      {client.diagnosis && (
+                        <div className="text-xs opacity-60 mt-0.5 ml-5">{client.diagnosis}</div>
+                      )}
+                    </button>
+                  ))}
                   {clients.filter(c => c.mode === mode).length === 0 && (
                     <p className="text-xs text-text-muted text-center py-4">
                       No {mode === 'army' ? 'Army' : 'Civilian'} clients. Switch mode or add a new client.
@@ -243,13 +260,8 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
         {step === 2 && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-text-secondary">Review and edit the transcription before generating feedback.</p>
-              <Button
-                variant="ghost"
-                size="xs"
-                icon={Edit3}
-                onClick={() => setEditingTranscription(!editingTranscription)}
-              >
+              <p className="text-sm text-text-secondary">Review and edit the transcription before analysis.</p>
+              <Button variant="ghost" size="xs" icon={Edit3} onClick={() => setEditingTranscription(!editingTranscription)}>
                 {editingTranscription ? 'Done' : 'Edit'}
               </Button>
             </div>
@@ -269,33 +281,90 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
           </div>
         )}
 
-        {/* Step 3: AI Feedback */}
+        {/* Step 3: AI Feedback + Follow-up recording */}
         {step === 3 && (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 mb-1">
+            {/* Feedback header */}
+            <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <Lightbulb className="w-3.5 h-3.5 text-primary" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-text-primary">AI Session Feedback</p>
-                <p className="text-xs text-text-muted">Follow-up questions to clarify the patient's presenting problem</p>
+                <p className="text-xs text-text-muted">Follow-up questions to better understand the patient's problem</p>
               </div>
             </div>
 
-            {aiFeedback ? (
-              <div className="space-y-2">
-                <div className="card-2 p-4 max-h-64 overflow-y-auto">
-                  <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">{aiFeedback}</p>
-                </div>
-                <p className="text-[11px] text-text-muted">
-                  This feedback will be saved with the session and included in staffing documents.
-                </p>
-              </div>
-            ) : (
-              <div className="card-2 p-6 text-center text-text-muted text-sm">
-                No feedback generated yet.
+            {aiFeedback && (
+              <div className="card-2 p-4 max-h-56 overflow-y-auto">
+                <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap">{aiFeedback}</p>
               </div>
             )}
+
+            {/* Follow-up transcription result */}
+            {followUpTranscription && (
+              <div className="rounded-lg border border-success/30 bg-success/5 p-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <CheckCircle className="w-3.5 h-3.5 text-success" />
+                  <span className="text-xs font-semibold text-success">Follow-up recorded & transcribed</span>
+                </div>
+                <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap max-h-28 overflow-y-auto">
+                  {followUpTranscription}
+                </p>
+              </div>
+            )}
+
+            {/* Follow-up recorder toggle */}
+            <div className="rounded-xl border border-border overflow-hidden">
+              <button
+                onClick={() => setShowFollowUp(v => !v)}
+                className="w-full flex items-center justify-between px-3 py-2.5 bg-surface-2 hover:bg-surface-3 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Mic className="w-3.5 h-3.5 text-primary" />
+                  <span className="text-xs font-semibold text-text-primary">
+                    {followUpTranscription ? 'Re-record Follow-up Questions' : 'Record Follow-up Questions'}
+                  </span>
+                </div>
+                {showFollowUp
+                  ? <ChevronUp className="w-3.5 h-3.5 text-text-muted" />
+                  : <ChevronDown className="w-3.5 h-3.5 text-text-muted" />
+                }
+              </button>
+
+              {showFollowUp && (
+                <div className="p-3 space-y-3 border-t border-border">
+                  <p className="text-xs text-text-muted">
+                    Use the AI feedback above as a guide. Record your follow-up questions and the patient's answers.
+                    Both recordings will be combined for the SOAP note.
+                  </p>
+                  <AudioRecorder onRecordingComplete={setFollowUpAudioBlob} />
+                  {followUpAudioBlob && !transcribingFollowUp && (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      className="w-full"
+                      onClick={handleTranscribeFollowUp}
+                      loading={transcribingFollowUp}
+                    >
+                      Transcribe Follow-up
+                    </Button>
+                  )}
+                  {transcribingFollowUp && (
+                    <div className="flex items-center gap-2 justify-center py-2 text-xs text-text-muted">
+                      <Loader className="w-3.5 h-3.5 animate-spin" />
+                      Transcribing follow-up...
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <p className="text-[11px] text-text-muted">
+              {followUpTranscription
+                ? 'Both transcriptions will be combined to generate a more complete SOAP note.'
+                : 'You can skip follow-up recording and proceed directly to the SOAP note.'}
+            </p>
           </div>
         )}
 
@@ -303,6 +372,12 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
         {step === 4 && soapNote && (
           <div className="space-y-3">
             <p className="text-sm text-text-secondary">Review and edit the generated SOAP note before saving.</p>
+            {followUpTranscription && (
+              <div className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary/10 border border-primary/20">
+                <CheckCircle className="w-3 h-3 text-primary flex-shrink-0" />
+                <p className="text-[11px] text-primary/80">Note generated from initial + follow-up session recordings.</p>
+              </div>
+            )}
             {(['subjective', 'objective', 'assessment', 'plan']).map(section => (
               <div key={section} className="space-y-1">
                 <label className="form-label">{section.charAt(0).toUpperCase() + section.slice(1)}</label>
