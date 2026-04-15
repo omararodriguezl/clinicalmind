@@ -1,9 +1,27 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Brain, Eye, EyeOff, Lock, Mail, Shield, ArrowLeft, CheckCircle } from 'lucide-react'
+import { Brain, Eye, EyeOff, Lock, Mail, Shield, ArrowLeft, CheckCircle, AlertTriangle } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import { supabase } from '../utils/supabase'
 import { Button } from '../components/ui/Button'
 import toast from 'react-hot-toast'
+
+const supabaseConfigured =
+  import.meta.env.VITE_SUPABASE_URL &&
+  !import.meta.env.VITE_SUPABASE_URL.includes('placeholder')
+
+function friendlyError(message) {
+  if (!message) return 'Something went wrong. Try again.'
+  if (message.includes('Invalid login credentials'))
+    return 'Incorrect email or password.'
+  if (message.includes('Email not confirmed'))
+    return 'EMAIL_NOT_CONFIRMED'
+  if (message.includes('fetch') || message.includes('NetworkError') || message.includes('Failed to fetch'))
+    return 'Cannot connect to the server. Check your Supabase credentials in Settings.'
+  if (message.includes('rate limit') || message.includes('too many'))
+    return 'Too many attempts. Wait a few minutes and try again.'
+  return message
+}
 
 export default function Login() {
   const { signIn, resetPassword } = useAuth()
@@ -15,17 +33,41 @@ export default function Login() {
   const [resetEmail, setResetEmail] = useState('')
   const [resetSent, setResetSent] = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
+  const [notConfirmed, setNotConfirmed] = useState(false)
+  const [resendLoading, setResendLoading] = useState(false)
 
   const handleSignIn = async (e) => {
     e.preventDefault()
+    setNotConfirmed(false)
     setLoading(true)
     try {
       await signIn(form.email, form.password)
       navigate('/dashboard')
     } catch (err) {
-      toast.error(err.message || 'Failed to sign in')
+      const msg = friendlyError(err.message)
+      if (msg === 'EMAIL_NOT_CONFIRMED') {
+        setNotConfirmed(true)
+      } else {
+        toast.error(msg)
+      }
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleResendConfirmation = async () => {
+    setResendLoading(true)
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: form.email,
+      })
+      if (error) throw error
+      toast.success('Confirmation email sent — check your inbox')
+    } catch (err) {
+      toast.error(err.message || 'Failed to resend email')
+    } finally {
+      setResendLoading(false)
     }
   }
 
@@ -36,7 +78,7 @@ export default function Login() {
       await resetPassword(resetEmail)
       setResetSent(true)
     } catch (err) {
-      toast.error(err.message || 'Failed to send reset email')
+      toast.error(friendlyError(err.message))
     } finally {
       setResetLoading(false)
     }
@@ -56,48 +98,50 @@ export default function Login() {
           <p className="text-sm text-text-secondary mt-1">AI-Assisted Clinical Documentation</p>
         </div>
 
+        {/* Supabase not configured warning */}
+        {!supabaseConfigured && (
+          <div className="mb-4 flex items-start gap-2 p-3 rounded-lg bg-warning-muted/30 border border-yellow-700">
+            <AlertTriangle className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-yellow-300 leading-relaxed">
+              Supabase is not configured. Add <code className="bg-black/30 px-1 rounded">VITE_SUPABASE_URL</code> and{' '}
+              <code className="bg-black/30 px-1 rounded">VITE_SUPABASE_ANON_KEY</code> to your <code className="bg-black/30 px-1 rounded">.env</code> file.
+            </p>
+          </div>
+        )}
+
         {/* ── Forgot Password flow ── */}
         {forgotMode ? (
           <div className="card p-6">
             {resetSent ? (
-              /* Success state */
               <div className="text-center space-y-3">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-success-muted border border-green-700 mb-1">
                   <CheckCircle className="w-6 h-6 text-success" />
                 </div>
                 <h2 className="text-base font-semibold text-text-primary">Check your email</h2>
                 <p className="text-sm text-text-secondary">
-                  We sent a password reset link to{' '}
+                  We sent a reset link to{' '}
                   <span className="text-text-primary font-medium">{resetEmail}</span>.
-                  Click the link in the email to set a new password.
                 </p>
-                <p className="text-xs text-text-muted">
-                  Didn't receive it? Check your spam folder.
-                </p>
+                <p className="text-xs text-text-muted">Didn't receive it? Check spam.</p>
                 <Button
                   variant="ghost"
                   size="sm"
                   icon={ArrowLeft}
                   onClick={() => { setForgotMode(false); setResetSent(false); setResetEmail('') }}
-                  className="mt-2"
                 >
                   Back to sign in
                 </Button>
               </div>
             ) : (
-              /* Email input state */
               <>
                 <button
                   onClick={() => setForgotMode(false)}
                   className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-secondary mb-4 transition-colors"
                 >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  Back to sign in
+                  <ArrowLeft className="w-3.5 h-3.5" /> Back to sign in
                 </button>
                 <h2 className="text-base font-semibold text-text-primary mb-1">Reset password</h2>
-                <p className="text-xs text-text-muted mb-5">
-                  Enter your email and we'll send you a link to reset your password.
-                </p>
+                <p className="text-xs text-text-muted mb-5">Enter your email to receive a reset link.</p>
                 <form onSubmit={handleResetPassword} className="space-y-4">
                   <div>
                     <label className="form-label">Email Address</label>
@@ -106,7 +150,6 @@ export default function Login() {
                       <input
                         type="email"
                         required
-                        autoComplete="email"
                         value={resetEmail}
                         onChange={(e) => setResetEmail(e.target.value)}
                         placeholder="you@example.com"
@@ -114,13 +157,7 @@ export default function Login() {
                       />
                     </div>
                   </div>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="lg"
-                    loading={resetLoading}
-                    className="w-full"
-                  >
+                  <Button type="submit" variant="primary" size="lg" loading={resetLoading} className="w-full">
                     Send Reset Link
                   </Button>
                 </form>
@@ -132,6 +169,25 @@ export default function Login() {
           <div className="card p-6">
             <h2 className="text-base font-semibold text-text-primary mb-1">Sign in to your account</h2>
             <p className="text-xs text-text-muted mb-5">Personal clinical workspace</p>
+
+            {/* Email not confirmed banner */}
+            {notConfirmed && (
+              <div className="mb-4 p-3 rounded-lg bg-warning-muted/30 border border-yellow-700 space-y-2">
+                <p className="text-xs text-yellow-300 font-medium">Email not confirmed</p>
+                <p className="text-xs text-yellow-300/80">
+                  Check your inbox for a confirmation email and click the link before signing in.
+                </p>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  loading={resendLoading}
+                  onClick={handleResendConfirmation}
+                  className="text-yellow-400 hover:text-yellow-300 !px-0"
+                >
+                  Resend confirmation email →
+                </Button>
+              </div>
+            )}
 
             <form onSubmit={handleSignIn} className="space-y-4">
               <div>
@@ -183,13 +239,7 @@ export default function Login() {
                 </div>
               </div>
 
-              <Button
-                type="submit"
-                variant="primary"
-                size="lg"
-                loading={loading}
-                className="w-full"
-              >
+              <Button type="submit" variant="primary" size="lg" loading={loading} className="w-full">
                 Sign In
               </Button>
             </form>
@@ -205,7 +255,6 @@ export default function Login() {
           </div>
         )}
 
-        {/* Security notice */}
         <div className="mt-4 flex items-start gap-2 p-3 rounded-lg bg-surface-2 border border-border">
           <Shield className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
           <p className="text-[11px] text-text-muted leading-relaxed">

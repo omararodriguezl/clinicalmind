@@ -5,6 +5,19 @@ import { useAuth } from '../hooks/useAuth'
 import { Button } from '../components/ui/Button'
 import toast from 'react-hot-toast'
 
+function friendlyError(message) {
+  if (!message) return 'Something went wrong. Try again.'
+  if (message.includes('User already registered') || message.includes('already been registered'))
+    return 'An account with this email already exists. Try signing in instead.'
+  if (message.includes('Password should be at least') || message.includes('password'))
+    return 'Password must be at least 8 characters.'
+  if (message.includes('valid email') || message.includes('email'))
+    return 'Please enter a valid email address.'
+  if (message.includes('fetch') || message.includes('NetworkError') || message.includes('Failed to fetch'))
+    return 'Cannot connect. Check your Supabase credentials in the .env file.'
+  return message
+}
+
 export default function SignUp() {
   const { signUp } = useAuth()
   const navigate = useNavigate()
@@ -12,6 +25,7 @@ export default function SignUp() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
+  const [emailConfirmRequired, setEmailConfirmRequired] = useState(false)
 
   const passwordStrong = form.password.length >= 8
 
@@ -27,10 +41,20 @@ export default function SignUp() {
     }
     setLoading(true)
     try {
-      await signUp(form.email, form.password)
+      const result = await signUp(form.email, form.password)
+
+      // If Supabase returns a session directly, email confirmation is disabled
+      // → log the user in immediately
+      if (result?.session) {
+        navigate('/dashboard')
+        return
+      }
+
+      // No session means email confirmation is required
+      setEmailConfirmRequired(true)
       setDone(true)
     } catch (err) {
-      toast.error(err.message || 'Failed to create account')
+      toast.error(friendlyError(err.message))
     } finally {
       setLoading(false)
     }
@@ -39,17 +63,33 @@ export default function SignUp() {
   if (done) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="w-full max-w-sm text-center">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-success-muted border border-green-700 mb-4">
+        <div className="w-full max-w-sm text-center space-y-4">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-success-muted border border-green-700">
             <CheckCircle className="w-7 h-7 text-success" />
           </div>
-          <h2 className="text-xl font-semibold text-text-primary mb-2">Check your email</h2>
-          <p className="text-sm text-text-secondary mb-6">
-            We sent a confirmation link to <strong className="text-text-primary">{form.email}</strong>.
-            Click it to activate your account.
-          </p>
-          <Link to="/login" className="text-sm text-primary hover:underline">
-            Back to sign in
+          <h2 className="text-xl font-semibold text-text-primary">Account created!</h2>
+
+          {emailConfirmRequired ? (
+            <>
+              <p className="text-sm text-text-secondary">
+                We sent a confirmation link to{' '}
+                <strong className="text-text-primary">{form.email}</strong>.
+                Click it to activate your account, then sign in.
+              </p>
+              <div className="p-3 rounded-lg bg-surface-2 border border-border text-left">
+                <p className="text-xs text-text-muted leading-relaxed">
+                  <span className="text-warning font-medium">Tip:</span> To skip this step for a personal app, go to your{' '}
+                  <strong className="text-text-secondary">Supabase Dashboard → Authentication → Providers → Email</strong>{' '}
+                  and disable <strong className="text-text-secondary">"Confirm email"</strong>.
+                </p>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-text-secondary">Redirecting you to the app...</p>
+          )}
+
+          <Link to="/login" className="inline-block text-sm text-primary hover:underline">
+            Go to sign in
           </Link>
         </div>
       </div>
@@ -135,13 +175,7 @@ export default function SignUp() {
               )}
             </div>
 
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              loading={loading}
-              className="w-full"
-            >
+            <Button type="submit" variant="primary" size="lg" loading={loading} className="w-full">
               Create Account
             </Button>
           </form>
@@ -149,9 +183,7 @@ export default function SignUp() {
           <div className="mt-5 pt-5 border-t border-border text-center">
             <p className="text-xs text-text-muted">
               Already have an account?{' '}
-              <Link to="/login" className="text-primary hover:underline font-medium">
-                Sign in
-              </Link>
+              <Link to="/login" className="text-primary hover:underline font-medium">Sign in</Link>
             </p>
           </div>
         </div>
