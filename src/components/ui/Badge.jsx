@@ -12,7 +12,7 @@ export function ModeBadge({ mode, size = 'sm' }) {
   return (
     <span className={`badge-civilian ${size === 'xs' ? 'text-xs py-0' : ''}`}>
       <Stethoscope className="w-3 h-3" />
-      Civilian RBT
+      Civilian
     </span>
   )
 }

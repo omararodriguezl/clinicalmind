@@ -181,7 +181,7 @@ export default function Dashboard() {
                     <div className="text-xs text-text-muted">
                       {new Date(session.session_date).toLocaleDateString()}
                       {' · '}
-                      {session.mode === 'army' ? '68X Army' : 'Civilian RBT'}
+                      {session.mode === 'army' ? '68X Army' : 'Civilian'}
                     </div>
                   </div>
                   <ArrowRight className="w-3.5 h-3.5 text-text-muted" />

@@ -198,7 +198,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
                         : 'bg-surface-2 text-text-secondary border-border hover:border-border-light'
                     }`}
                   >
-                    {m === 'army' ? '68X Army' : 'Civilian RBT'}
+                    {m === 'army' ? '68X Army' : 'Civilian'}
                   </button>
                 ))}
               </div>

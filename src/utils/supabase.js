@@ -74,9 +74,9 @@ export async function getSessions(userId, clientId = null) {
   let query = supabase
     .from('sessions')
     .select('*, clients(name, client_id_number)')
-    .eq('user_id', userId)
     .order('session_date', { ascending: false })
 
+  if (userId) query = query.eq('user_id', userId)
   if (clientId) query = query.eq('client_id', clientId)
 
   const { data, error } = await query

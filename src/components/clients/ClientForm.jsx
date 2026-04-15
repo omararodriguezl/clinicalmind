@@ -46,7 +46,7 @@ export function ClientForm({ initialData, onSubmit, onCancel, loading }) {
                 : 'bg-surface-2 text-text-secondary border-border hover:border-border-light'
             }`}
           >
-            Civilian RBT
+            Civilian
           </button>
         </div>
       </div>
