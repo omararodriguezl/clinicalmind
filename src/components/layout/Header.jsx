@@ -1,15 +1,16 @@
 import { useLocation } from 'react-router-dom'
-import { Wifi, WifiOff, Brain } from 'lucide-react'
+import { WifiOff } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { ThemeToggle } from '../ui/ThemeToggle'
 
 const PAGE_TITLES = {
   '/dashboard': 'Dashboard',
-  '/clients': 'Clients',
-  '/sessions': 'Sessions',
-  '/safety': 'Safety Plans',
-  '/staffing': 'Staffing Documents',
-  '/dsm': 'DSM-5 Reference',
-  '/settings': 'Settings',
+  '/clients':   'Clients',
+  '/sessions':  'Sessions',
+  '/safety':    'Safety Plans',
+  '/staffing':  'Staffing Documents',
+  '/dsm':       'DSM-5 Reference',
+  '/settings':  'Settings',
 }
 
 function OnlineIndicator() {
@@ -24,9 +25,13 @@ function OnlineIndicator() {
 
   if (online) return null
   return (
-    <div className="flex items-center gap-1.5 text-xs text-warning bg-warning-muted px-2.5 py-1 rounded-full border border-yellow-700">
+    <div className="flex items-center gap-1.5 px-2.5 py-1" style={{
+      fontFamily: 'JetBrains Mono, monospace', fontSize: 9,
+      letterSpacing: '0.18em', border: '1px solid var(--cm-warn)',
+      background: 'var(--cm-warn-soft)', color: 'var(--cm-warn)', borderRadius: 2,
+    }}>
       <WifiOff className="w-3 h-3" />
-      <span>Offline</span>
+      OFFLINE
     </div>
   )
 }
@@ -36,28 +41,40 @@ export function Header({ title, actions, backButton }) {
   const pageTitle = title || PAGE_TITLES[location.pathname] || 'ClinicalMind'
 
   return (
-    <header className="sticky top-0 z-30 bg-surface/80 backdrop-blur-md border-b border-border px-4 md:px-6 h-14 flex items-center gap-3 flex-shrink-0">
-      {/* Back button (mobile) */}
-      {backButton && (
-        <div className="flex-shrink-0">{backButton}</div>
-      )}
+    <header className="sticky top-0 z-30 flex-shrink-0 flex items-center gap-3 px-4 md:px-6"
+      style={{
+        height: 48,
+        background: 'var(--cm-surface)',
+        borderBottom: '1px solid var(--cm-line)',
+      }}
+    >
+      {backButton && <div className="flex-shrink-0">{backButton}</div>}
 
-      {/* Mobile logo */}
+      {/* Mobile: app name */}
       <div className="md:hidden flex items-center gap-2 mr-auto">
-        <div className="w-6 h-6 rounded bg-primary/20 flex items-center justify-center">
-          <Brain className="w-3.5 h-3.5 text-primary" />
+        <div style={{
+          width: 24, height: 24, border: '1px solid var(--cm-od)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 2,
+        }}>
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="var(--cm-od)" strokeWidth="1.4" strokeLinejoin="round">
+            <path d="M8 1.5L2.5 3.5v5C2.5 11.5 5 13.5 8 14.5c3-1 5.5-3 5.5-6v-5L8 1.5z"/>
+          </svg>
         </div>
-        <span className="font-semibold text-sm text-text-primary">{pageTitle}</span>
+        <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--cm-ink)' }}>{pageTitle}</span>
       </div>
 
-      {/* Desktop title */}
-      <h1 className="hidden md:block text-base font-semibold text-text-primary flex-1">
-        {pageTitle}
-      </h1>
+      {/* Desktop: stencil title */}
+      <div className="hidden md:flex items-center gap-3 flex-1 min-w-0">
+        <div className="mono-label" style={{ fontSize: 9 }}>OP //</div>
+        <h1 style={{ fontSize: 14, fontWeight: 700, color: 'var(--cm-ink)', letterSpacing: '-0.01em' }}>
+          {pageTitle}
+        </h1>
+      </div>
 
       <div className="flex items-center gap-2 ml-auto md:ml-0">
         <OnlineIndicator />
         {actions}
+        <ThemeToggle />
       </div>
     </header>
   )
