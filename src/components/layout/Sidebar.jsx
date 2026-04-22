@@ -116,6 +116,7 @@ export function MobileNav() {
     { to: '/sessions',  icon: Mic,             label: 'Sessions', code: '03' },
     { to: '/safety',    icon: ShieldAlert,     label: 'Safety',   code: '04' },
     { to: '/dsm',       icon: BookOpen,        label: 'DSM-5',    code: '06' },
+    { to: '/settings',  icon: Settings,        label: 'Settings', code: '07' },
   ]
 
   return (
