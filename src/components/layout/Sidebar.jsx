@@ -23,7 +23,7 @@ function NavItem({ to, icon: Icon, label, code, mobile = false }) {
       className={({ isActive }) => [
         'flex items-center transition-all duration-100',
         mobile
-          ? 'flex-col gap-0.5 py-1.5 px-2 text-center'
+          ? 'flex-col gap-1 py-3 px-2 text-center'
           : 'gap-2.5 px-3 py-2 w-full',
         isActive
           ? mobile
@@ -36,7 +36,7 @@ function NavItem({ to, icon: Icon, label, code, mobile = false }) {
     >
       {({ isActive }) => (
         <>
-          <Icon className={mobile ? 'w-5 h-5' : 'w-3.5 h-3.5 flex-shrink-0'} />
+          <Icon className={mobile ? 'w-6 h-6' : 'w-3.5 h-3.5 flex-shrink-0'} />
           {mobile ? (
             <span style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.08em', fontWeight: 600 }}>{label.toUpperCase()}</span>
           ) : (
@@ -123,7 +123,7 @@ export function MobileNav() {
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 pb-safe"
       style={{ background: 'var(--cm-surface)', borderTop: '1px solid var(--cm-line)' }}
     >
-      <div className="flex items-stretch justify-around px-1 pt-1">
+      <div className="flex items-stretch justify-around px-1 pt-1 pb-2">
         {mobileItems.map(item => (
           <NavItem key={item.to} {...item} mobile />
         ))}
