@@ -23,7 +23,7 @@ function NavItem({ to, icon: Icon, label, code, mobile = false }) {
       className={({ isActive }) => [
         'flex items-center transition-all duration-100',
         mobile
-          ? 'flex-col gap-1 py-3 px-2 text-center'
+          ? 'flex-col gap-1.5 py-2 px-3 text-center'
           : 'gap-2.5 px-3 py-2 w-full',
         isActive
           ? mobile
@@ -38,7 +38,7 @@ function NavItem({ to, icon: Icon, label, code, mobile = false }) {
         <>
           <Icon className={mobile ? 'w-6 h-6' : 'w-3.5 h-3.5 flex-shrink-0'} />
           {mobile ? (
-            <span style={{ fontSize: 9, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.08em', fontWeight: 600 }}>{label.toUpperCase()}</span>
+            <span style={{ fontSize: 10, fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.06em', fontWeight: 600 }}>{label.toUpperCase()}</span>
           ) : (
             <>
               <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, flex: 1 }}>{label}</span>
@@ -120,10 +120,14 @@ export function MobileNav() {
   ]
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 pb-safe"
-      style={{ background: 'var(--cm-surface)', borderTop: '1px solid var(--cm-line)' }}
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40"
+      style={{
+        background: 'var(--cm-surface)',
+        borderTop: '1px solid var(--cm-line)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}
     >
-      <div className="flex items-stretch justify-around px-1 pt-1 pb-2">
+      <div className="flex items-center justify-around px-2 pt-2 pb-3">
         {mobileItems.map(item => (
           <NavItem key={item.to} {...item} mobile />
         ))}
