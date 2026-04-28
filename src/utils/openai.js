@@ -207,6 +207,78 @@ export async function queryDSM(question, apiKey) {
   return data.choices[0].message.content
 }
 
+// ── Group Session Plan Generator ──────────────────────────────────────────────
+
+export async function generateGroupSession(topic, groupType, duration, apiKey) {
+  const key = apiKey || getOpenAIKey()
+  if (!key) throw new Error('OpenAI API key not configured.')
+
+  const typeLabel = groupType === 'psychoeducational' ? 'Psychoeducational' : 'Process Group'
+  const typeGuidance = groupType === 'psychoeducational'
+    ? 'structure the session around teaching, skill-building, and concrete takeaways. The facilitator does most of the talking. Include more content to present and a structured activity.'
+    : 'structure the session around facilitated discussion, reflection, and shared experience. The facilitator talks less and guides more. Include more open-ended questions, techniques for drawing out participation, and guidance on managing group dynamics.'
+  const questionsGuidance = groupType === 'psychoeducational'
+    ? 'focus on applying the content'
+    : 'focus on deeper reflection and shared experience'
+
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: `You are an expert Army behavioral health group facilitator and licensed mental health clinician. You create structured, evidence-based group counseling session plans for military populations at a Military Treatment Facility. Your plans are practical, trauma-informed, and use plain language appropriate for enlisted soldiers and junior officers.`,
+        },
+        {
+          role: 'user',
+          content: `Generate a complete group counseling session plan with the following details:
+- Topic: ${topic}
+- Group type: ${typeLabel}
+- Duration: ${duration} minutes
+
+If Psychoeducational: ${typeGuidance}
+If Process Group: ${typeGuidance}
+
+Provide exactly these 7 sections, clearly labeled with these exact headers:
+
+1. SESSION OVERVIEW
+A 2-3 sentence summary of the session goals and what participants will leave with.
+
+2. TIMED OUTLINE
+A phase-by-phase outline with exact minute allocations that add up to ${duration} minutes total. Phases: Opening & Check-in, [Main Content / Topic Introduction], Activity or Exercise, Discussion & Processing, Closing & Takeaways.
+
+3. FULL FACILITATOR SCRIPT
+Everything the facilitator says, word for word, for each phase. Write in first person as if speaking directly to the group. Include transitions between phases. For Process Groups, include specific prompts and follow-up probes.
+
+4. ACTIVITY OR EXERCISE
+One structured activity appropriate for the topic and group type. Include the name of the activity, its purpose, step-by-step instructions for running it, and estimated time.
+
+5. PROCESSING QUESTIONS
+6-8 open-ended questions to facilitate group discussion. For Psychoeducational groups, ${questionsGuidance}. For Process Groups, ${questionsGuidance}.
+
+6. KEY TAKEAWAYS
+3-5 bullet points with the main messages participants should leave with.
+
+7. FACILITATOR NOTES
+Clinical tips specific to this topic with a military population: things to watch for, how to handle resistance or silence, common reactions, and any duty-to-warn considerations if relevant.`,
+        },
+      ],
+      temperature: 0.5,
+      max_tokens: 4000,
+    }),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err?.error?.message || `GPT-4 API error: ${res.status}`)
+  }
+
+  const data = await res.json()
+  return data.choices[0].message.content
+}
+
 // ── Prompt Builders ────────────────────────────────────────────────────────────
 
 function buildNoteSystemPrompt(mode, customPrompt) {

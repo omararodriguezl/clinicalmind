@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Users, Mic, ShieldAlert,
-  ClipboardList, BookOpen, Settings, LogOut,
+  ClipboardList, BookOpen, Settings, LogOut, GraduationCap,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard',       code: '01' },
   { to: '/clients',   icon: Users,           label: 'Clients',         code: '02' },
   { to: '/sessions',  icon: Mic,             label: 'Sessions',        code: '03' },
+  { to: '/groups',    icon: GraduationCap,   label: 'Group Sessions',  code: '08' },
   { to: '/safety',    icon: ShieldAlert,     label: 'Safety Plans',    code: '04' },
   { to: '/staffing',  icon: ClipboardList,   label: 'Staffing',        code: '05' },
   { to: '/dsm',       icon: BookOpen,        label: 'DSM-5',           code: '06' },
@@ -114,6 +115,7 @@ export function MobileNav() {
     { to: '/dashboard', icon: LayoutDashboard, label: 'Home',     code: '01' },
     { to: '/clients',   icon: Users,           label: 'Clients',  code: '02' },
     { to: '/sessions',  icon: Mic,             label: 'Sessions', code: '03' },
+    { to: '/groups',    icon: GraduationCap,   label: 'Groups',   code: '08' },
     { to: '/safety',    icon: ShieldAlert,     label: 'Safety',   code: '04' },
     { to: '/dsm',       icon: BookOpen,        label: 'DSM-5',    code: '06' },
     { to: '/settings',  icon: Settings,        label: 'Settings', code: '07' },

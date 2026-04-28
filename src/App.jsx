@@ -17,6 +17,7 @@ import Staffing from './pages/Staffing'
 import DSMReference from './pages/DSMReference'
 import Settings from './pages/Settings'
 import ResetPassword from './pages/ResetPassword'
+import GroupSessions from './pages/GroupSessions'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -47,6 +48,7 @@ function AppRoutes() {
       <Route path="/staffing"       element={<ProtectedRoute><Staffing /></ProtectedRoute>} />
       <Route path="/dsm"            element={<ProtectedRoute><DSMReference /></ProtectedRoute>} />
       <Route path="/settings"       element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+      <Route path="/groups"         element={<ProtectedRoute><GroupSessions /></ProtectedRoute>} />
       <Route path="/"               element={<Navigate to="/dashboard" replace />} />
       <Route path="*"               element={<Navigate to="/dashboard" replace />} />
     </Routes>

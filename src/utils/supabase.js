@@ -186,11 +186,55 @@ export async function upsertUserSettings(settings) {
   return data
 }
 
+// ── Group Sessions ────────────────────────────────────────────────────────────
+// Required table (run once in Supabase SQL editor):
+// create table if not exists group_sessions (
+//   id uuid primary key default gen_random_uuid(),
+//   user_id uuid references auth.users(id) on delete cascade,
+//   topic text,
+//   group_type text,
+//   duration_minutes integer,
+//   generated_plan text,
+//   created_at timestamptz default now()
+// );
+
+export async function saveGroupSession(session) {
+  const { data, error } = await supabase
+    .from('group_sessions')
+    .insert([session])
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function getGroupSessions(userId) {
+  const { data, error } = await supabase
+    .from('group_sessions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data
+}
+
+export async function getGroupSession(id) {
+  const { data, error } = await supabase
+    .from('group_sessions')
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (error) throw error
+  return data
+}
+
 // ── Clinician Notes ───────────────────────────────────────────────────────────
 // Required table (run once in Supabase SQL editor):
+// Note: session_id stores either a sessions.id or a group_sessions.id (no FK
+// constraint so it works for both individual and group sessions).
 // create table if not exists clinician_notes (
 //   id uuid primary key default gen_random_uuid(),
-//   session_id uuid references sessions(id) on delete cascade,
+//   session_id uuid,
 //   content text,
 //   canvas_image text,
 //   created_at timestamptz default now()
