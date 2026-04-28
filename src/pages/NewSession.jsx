@@ -17,13 +17,11 @@ export default function NewSession() {
 
   return (
     <Layout title="New Session">
-      <div className="max-w-4xl mx-auto">
-        <NewSessionWizard
-          preselectedClientId={clientId}
-          onComplete={handleComplete}
-          onCancel={handleCancel}
-        />
-      </div>
+      <NewSessionWizard
+        preselectedClientId={clientId}
+        onComplete={handleComplete}
+        onCancel={handleCancel}
+      />
     </Layout>
   )
 }
