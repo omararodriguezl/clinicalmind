@@ -186,6 +186,36 @@ export async function upsertUserSettings(settings) {
   return data
 }
 
+// ── Clinician Notes ───────────────────────────────────────────────────────────
+// Required table (run once in Supabase SQL editor):
+// create table if not exists clinician_notes (
+//   id uuid primary key default gen_random_uuid(),
+//   session_id uuid references sessions(id) on delete cascade,
+//   content text,
+//   canvas_image text,
+//   created_at timestamptz default now()
+// );
+
+export async function saveClinicianNote(note) {
+  const { data, error } = await supabase
+    .from('clinician_notes')
+    .insert([note])
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function getClinicianNotes(sessionId) {
+  const { data, error } = await supabase
+    .from('clinician_notes')
+    .select('*')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data
+}
+
 // ── DSM Favorites ─────────────────────────────────────────────────────────────
 
 export async function getDsmFavorites(userId) {

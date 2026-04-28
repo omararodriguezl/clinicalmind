@@ -1,17 +1,26 @@
 import { useState, useEffect } from 'react'
 import {
   ChevronRight, ChevronLeft, CheckCircle,
-  Loader, AlertCircle, Edit3, Users, Lightbulb, Mic, ChevronDown, ChevronUp
+  Loader, AlertCircle, Edit3, Users, Lightbulb, Mic,
+  ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { AudioRecorder } from './AudioRecorder'
 import { IntakeGuide } from './IntakeGuide'
+import { TriageGuide } from './TriageGuide'
+import { ClinicianScratchpad } from './ClinicianScratchpad'
 import { useAuth } from '../../hooks/useAuth'
-import { getClients, createSession } from '../../utils/supabase'
+import { getClients, createSession, saveClinicianNote } from '../../utils/supabase'
 import { transcribeAudio, generateNote, generateSessionFeedback, getOpenAIKey } from '../../utils/openai'
 import toast from 'react-hot-toast'
 
 const STEPS = ['Client & Mode', 'Record Audio', 'Transcription', 'AI Feedback', 'SOAP Note']
+
+const MODES = [
+  { value: 'army',     label: '68X Army' },
+  { value: 'civilian', label: 'Civilian' },
+  { value: 'triage',   label: 'Triage' },
+]
 
 export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) {
   const { user } = useAuth()
@@ -20,10 +29,16 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
   const [selectedClient, setSelectedClient] = useState(null)
   const [mode, setMode] = useState('civilian')
 
+  // Recording toggle (optional)
+  const [recordingEnabled, setRecordingEnabled] = useState(false)
+
   // Initial recording
   const [audioBlob, setAudioBlob] = useState(null)
   const [transcription, setTranscription] = useState('')
   const [editingTranscription, setEditingTranscription] = useState(false)
+
+  // Clinician scratchpad data { text, image }
+  const [scratchpadData, setScratchpadData] = useState({ text: '', image: null })
 
   // AI feedback
   const [aiFeedback, setAiFeedback] = useState('')
@@ -57,7 +72,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
 
   const canProceed = () => {
     if (step === 0) return !!selectedClient
-    if (step === 1) return !!audioBlob
+    if (step === 1) return true // recording is optional
     if (step === 2) return !!transcription.trim()
     return true
   }
@@ -82,17 +97,37 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
 
     if (step === 1) {
       if (!apiKey) { setError('OpenAI API key not configured. Go to Settings to add your key.'); return }
-      setProcessing(true)
-      setProcessingMsg('Transcribing audio with Whisper...')
-      try {
-        const text = await transcribeAudio(audioBlob, apiKey)
-        setTranscription(text)
-        setStep(2)
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setProcessing(false)
-        setProcessingMsg('')
+
+      if (audioBlob) {
+        // Has audio — transcribe and go to review step
+        setProcessing(true)
+        setProcessingMsg('Transcribing audio with Whisper...')
+        try {
+          const text = await transcribeAudio(audioBlob, apiKey)
+          setTranscription(text)
+          setStep(2)
+        } catch (err) {
+          setError(err.message)
+        } finally {
+          setProcessing(false)
+          setProcessingMsg('')
+        }
+      } else {
+        // No audio — skip transcription review, go directly to AI Feedback
+        setProcessing(true)
+        setProcessingMsg('Analyzing with GPT-4...')
+        try {
+          const input = scratchpadData.text || ''
+          setTranscription(input)
+          const feedback = await generateSessionFeedback(input, mode, selectedClient, apiKey, scratchpadData.text)
+          setAiFeedback(feedback)
+          setStep(3)
+        } catch (err) {
+          setError(err.message)
+        } finally {
+          setProcessing(false)
+          setProcessingMsg('')
+        }
       }
       return
     }
@@ -102,7 +137,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
       setProcessing(true)
       setProcessingMsg('Analyzing session with GPT-4...')
       try {
-        const feedback = await generateSessionFeedback(transcription, mode, selectedClient, apiKey)
+        const feedback = await generateSessionFeedback(transcription, mode, selectedClient, apiKey, scratchpadData.text)
         setAiFeedback(feedback)
         setStep(3)
       } catch (err) {
@@ -119,11 +154,10 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
       setProcessing(true)
       setProcessingMsg('Generating SOAP note with GPT-4...')
       try {
-        // Combine initial + follow-up transcriptions if follow-up exists
         const combined = followUpTranscription
           ? `[INITIAL SESSION]\n${transcription}\n\n[FOLLOW-UP QUESTIONS — after AI feedback]\n${followUpTranscription}`
           : transcription
-        const note = await generateNote(combined, mode, selectedClient, null, apiKey)
+        const note = await generateNote(combined, mode, selectedClient, null, apiKey, scratchpadData.text)
         setSoapNote(note)
         setStep(4)
       } catch (err) {
@@ -152,12 +186,29 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
         ai_feedback: aiFeedback || null,
         ...soapNote,
       })
+
+      // Save clinician note non-blocking (table may not exist yet)
+      if (scratchpadData.text || scratchpadData.image) {
+        saveClinicianNote({
+          session_id: session.id,
+          content: scratchpadData.text || '',
+          canvas_image: scratchpadData.image || null,
+        }).catch(err => console.warn('clinician_notes save failed:', err.message))
+      }
+
       onComplete(session)
     } catch (err) {
       toast.error(err.message)
     } finally {
       setSaving(false)
     }
+  }
+
+  const nextLabel = () => {
+    if (step === 1) return audioBlob ? 'Transcribe' : 'Continue'
+    if (step === 2) return 'Analyze with AI'
+    if (step === 3) return 'Generate Note'
+    return 'Next'
   }
 
   return (
@@ -182,23 +233,27 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
       {/* Step content */}
       <div className="flex-1 min-h-0 overflow-y-auto space-y-4">
 
-        {/* Step 0: Select client & mode */}
+        {/* ── Step 0: Select client & mode ─────────────────────────────────── */}
         {step === 0 && (
           <div className="space-y-4">
             <div>
-              <label className="form-label">Mode</label>
+              <label className="form-label">Session Type</label>
               <div className="flex gap-2">
-                {['army', 'civilian'].map(m => (
+                {MODES.map(m => (
                   <button
-                    key={m}
-                    onClick={() => setMode(m)}
+                    key={m.value}
+                    onClick={() => setMode(m.value)}
                     className={`flex-1 py-2.5 text-sm font-medium rounded-md border transition-all ${
-                      mode === m
-                        ? m === 'army' ? 'bg-army-muted text-army-text border-army-border' : 'bg-civilian-muted text-civilian-text border-civilian-border'
+                      mode === m.value
+                        ? m.value === 'army'
+                          ? 'bg-army-muted text-army-text border-army-border'
+                          : m.value === 'triage'
+                            ? 'bg-warning-muted text-warning border-warning'
+                            : 'bg-civilian-muted text-civilian-text border-civilian-border'
                         : 'bg-surface-2 text-text-secondary border-border hover:border-border-light'
                     }`}
                   >
-                    {m === 'army' ? '68X Army' : 'Civilian'}
+                    {m.label}
                   </button>
                 ))}
               </div>
@@ -212,27 +267,33 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
                 </div>
               ) : (
                 <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
-                  {clients.filter(c => c.mode === mode).map(client => (
-                    <button
-                      key={client.id}
-                      onClick={() => setSelectedClient(client)}
-                      className={`w-full text-left p-3 rounded-lg border transition-all ${
-                        selectedClient?.id === client.id
-                          ? mode === 'army' ? 'bg-army-muted border-army-border text-army-text' : 'bg-civilian-muted border-civilian-border text-civilian-text'
-                          : 'bg-surface-2 border-border hover:border-border-light text-text-primary'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Users className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
-                        <span className="text-sm font-medium">{client.name}</span>
-                        <span className="text-xs opacity-60 font-mono ml-auto">#{client.client_id_number}</span>
-                      </div>
-                      {client.diagnosis && (
-                        <div className="text-xs opacity-60 mt-0.5 ml-5">{client.diagnosis}</div>
-                      )}
-                    </button>
-                  ))}
-                  {clients.filter(c => c.mode === mode).length === 0 && (
+                  {clients
+                    .filter(c => mode === 'triage' || c.mode === mode)
+                    .map(client => (
+                      <button
+                        key={client.id}
+                        onClick={() => setSelectedClient(client)}
+                        className={`w-full text-left p-3 rounded-lg border transition-all ${
+                          selectedClient?.id === client.id
+                            ? mode === 'army'
+                              ? 'bg-army-muted border-army-border text-army-text'
+                              : mode === 'triage'
+                                ? 'bg-warning-muted border-warning text-warning'
+                                : 'bg-civilian-muted border-civilian-border text-civilian-text'
+                            : 'bg-surface-2 border-border hover:border-border-light text-text-primary'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Users className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
+                          <span className="text-sm font-medium">{client.name}</span>
+                          <span className="text-xs opacity-60 font-mono ml-auto">#{client.client_id_number}</span>
+                        </div>
+                        {client.diagnosis && (
+                          <div className="text-xs opacity-60 mt-0.5 ml-5">{client.diagnosis}</div>
+                        )}
+                      </button>
+                    ))}
+                  {clients.filter(c => mode === 'triage' || c.mode === mode).length === 0 && (
                     <p className="text-xs text-text-muted text-center py-4">
                       No {mode === 'army' ? 'Army' : 'Civilian'} clients. Switch mode or add a new client.
                     </p>
@@ -243,20 +304,54 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
           </div>
         )}
 
-        {/* Step 1: Record audio + Intake Guide */}
+        {/* ── Step 1: Record audio + Guide + Scratchpad ─────────────────────── */}
         {step === 1 && (
           <div className="space-y-3">
             <p className="text-sm text-text-secondary">
-              Record your session with{' '}
+              Session with{' '}
               <span className="text-text-primary font-medium">{selectedClient?.name}</span>.
-              Audio is saved locally and never stored in the cloud.
+              {mode === 'triage' && <span className="ml-1 text-warning font-medium">[Triage]</span>}
             </p>
-            <AudioRecorder onRecordingComplete={setAudioBlob} />
-            <IntakeGuide />
+
+            {/* Recording toggle */}
+            <div className="flex items-center justify-between px-3 py-2 rounded-md bg-surface-2 border border-border">
+              <div>
+                <p className="text-sm font-medium text-text-primary">Record this session</p>
+                <p className="text-xs text-text-muted">Optional — session can be saved with notes only</p>
+              </div>
+              <button
+                onClick={() => { setRecordingEnabled(v => !v); setAudioBlob(null) }}
+                className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${
+                  recordingEnabled ? 'bg-primary' : 'bg-surface-3'
+                }`}
+              >
+                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                  recordingEnabled ? 'translate-x-5' : 'translate-x-0.5'
+                }`} />
+              </button>
+            </div>
+
+            {/* AudioRecorder — only when toggle is on */}
+            {recordingEnabled && (
+              <AudioRecorder onRecordingComplete={setAudioBlob} />
+            )}
+
+            {/* Horizontal split: Guide (left) + Scratchpad (right) */}
+            <div className="flex flex-col md:flex-row gap-3">
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {mode === 'triage' ? <TriageGuide /> : <IntakeGuide />}
+              </div>
+              <div style={{ width: '100%', maxWidth: 230, flexShrink: 0 }}>
+                <ClinicianScratchpad
+                  onSave={data => setScratchpadData(data)}
+                  onTextChange={text => setScratchpadData(d => ({ ...d, text }))}
+                />
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Step 2: Review transcription */}
+        {/* ── Step 2: Review transcription ─────────────────────────────────── */}
         {step === 2 && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -278,13 +373,22 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
                 </p>
               </div>
             )}
+            {scratchpadData.text && (
+              <div className="rounded-md border border-border px-3 py-2 bg-surface-2">
+                <p className="text-[10px] text-text-muted mb-1" style={{ fontFamily: 'JetBrains Mono, monospace', letterSpacing: '0.1em' }}>
+                  CLINICIAN NOTES
+                </p>
+                <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap max-h-24 overflow-y-auto">
+                  {scratchpadData.text}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Step 3: AI Feedback + Follow-up recording */}
+        {/* ── Step 3: AI Feedback + Follow-up recording ────────────────────── */}
         {step === 3 && (
           <div className="space-y-3">
-            {/* Feedback header */}
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <Lightbulb className="w-3.5 h-3.5 text-primary" />
@@ -301,7 +405,6 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
               </div>
             )}
 
-            {/* Follow-up transcription result */}
             {followUpTranscription && (
               <div className="rounded-lg border border-success/30 bg-success/5 p-3">
                 <div className="flex items-center gap-1.5 mb-2">
@@ -314,7 +417,6 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
               </div>
             )}
 
-            {/* Follow-up recorder toggle */}
             <div className="rounded-xl border border-border overflow-hidden">
               <button
                 onClick={() => setShowFollowUp(v => !v)}
@@ -328,8 +430,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
                 </div>
                 {showFollowUp
                   ? <ChevronUp className="w-3.5 h-3.5 text-text-muted" />
-                  : <ChevronDown className="w-3.5 h-3.5 text-text-muted" />
-                }
+                  : <ChevronDown className="w-3.5 h-3.5 text-text-muted" />}
               </button>
 
               {showFollowUp && (
@@ -368,7 +469,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
           </div>
         )}
 
-        {/* Step 4: Review generated SOAP note */}
+        {/* ── Step 4: Review generated SOAP note ───────────────────────────── */}
         {step === 4 && soapNote && (
           <div className="space-y-3">
             <p className="text-sm text-text-secondary">Review and edit the generated SOAP note before saving.</p>
@@ -376,6 +477,12 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
               <div className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-primary/10 border border-primary/20">
                 <CheckCircle className="w-3 h-3 text-primary flex-shrink-0" />
                 <p className="text-[11px] text-primary/80">Note generated from initial + follow-up session recordings.</p>
+              </div>
+            )}
+            {scratchpadData.text && (
+              <div className="flex items-center gap-1.5 px-3 py-2 rounded-md bg-surface-2 border border-border">
+                <CheckCircle className="w-3 h-3 text-text-muted flex-shrink-0" />
+                <p className="text-[11px] text-text-muted">Clinician notes included in SOAP generation.</p>
               </div>
             )}
             {(['subjective', 'objective', 'assessment', 'plan']).map(section => (
@@ -434,7 +541,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
             loading={processing}
             iconRight={ChevronRight}
           >
-            {step === 1 ? 'Transcribe' : step === 2 ? 'Analyze with AI' : step === 3 ? 'Generate Note' : 'Next'}
+            {nextLabel()}
           </Button>
         )}
       </div>

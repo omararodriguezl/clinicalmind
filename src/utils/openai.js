@@ -32,12 +32,12 @@ export async function transcribeAudio(audioBlob, apiKey) {
 
 // ── Note Generation (GPT-4) ───────────────────────────────────────────────────
 
-export async function generateNote(transcription, mode, clientInfo, customPrompt, apiKey) {
+export async function generateNote(transcription, mode, clientInfo, customPrompt, apiKey, clinicianNotes = '') {
   const key = apiKey || getOpenAIKey()
   if (!key) throw new Error('OpenAI API key not configured. Go to Settings to add your key.')
 
   const systemPrompt = buildNoteSystemPrompt(mode, customPrompt)
-  const userMessage = buildNoteUserMessage(transcription, clientInfo)
+  const userMessage = buildNoteUserMessage(transcription, clientInfo, clinicianNotes)
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -103,14 +103,16 @@ export async function generateStaffingDocument(clientInfo, sessions, mode, custo
 
 // ── Session Feedback (AI Follow-up Questions) ─────────────────────────────────
 
-export async function generateSessionFeedback(transcription, mode, clientInfo, apiKey) {
+export async function generateSessionFeedback(transcription, mode, clientInfo, apiKey, clinicianNotes = '') {
   const key = apiKey || getOpenAIKey()
   if (!key) throw new Error('OpenAI API key not configured. Go to Settings to add your key.')
 
   const modeContext =
     mode === 'army'
       ? 'a US Army 68X Mental Health Specialist conducting a behavioral health assessment on a service member'
-      : 'a behavioral health RBT/clinician conducting a session with a civilian client'
+      : mode === 'triage'
+        ? 'a US Army 68X Mental Health Specialist conducting a triage/walk-in behavioral health assessment'
+        : 'a behavioral health RBT/clinician conducting a session with a civilian client'
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -145,13 +147,13 @@ Keep questions direct, open-ended, and clinically relevant.`,
           role: 'user',
           content: `Client ID: ${clientInfo.client_id_number}
 Diagnosis: ${clientInfo.diagnosis || 'Not yet specified'}
-${mode === 'army' ? `Rank/Unit: ${clientInfo.rank || 'N/A'} / ${clientInfo.unit || 'N/A'}` : ''}
+${mode === 'army' || mode === 'triage' ? `Rank/Unit: ${clientInfo.rank || 'N/A'} / ${clientInfo.unit || 'N/A'}` : ''}
 
 Session Transcription:
 ---
-${transcription}
+${transcription || 'No audio transcription available.'}
 ---
-
+${clinicianNotes ? `\nClinician Notes (supplementary observations):\n---\n${clinicianNotes}\n---\n` : ''}
 Please analyze this session and provide follow-up questions to better understand the patient's presenting problem.`,
         },
       ],
@@ -208,9 +210,9 @@ export async function queryDSM(question, apiKey) {
 // ── Prompt Builders ────────────────────────────────────────────────────────────
 
 function buildNoteSystemPrompt(mode, customPrompt) {
-  const base =
-    mode === 'army'
-      ? `You are a US Army 68X Mental Health Specialist documentation assistant.
+  let base
+  if (mode === 'army') {
+    base = `You are a US Army 68X Mental Health Specialist documentation assistant.
 Generate clinical notes in military SOAP format. Use military behavioral health terminology.
 Always include military-specific resources (chaplain, chain of command, Veterans Crisis Line 1-800-273-8255 press 1).
 Be professional, objective, and clinically precise.
@@ -226,7 +228,25 @@ ASSESSMENT:
 
 PLAN:
 [content]`
-      : `You are a clinical documentation assistant for a behavioral health RBT/clinician.
+  } else if (mode === 'triage') {
+    base = `You are a US Army 68X Mental Health Specialist documentation assistant writing a triage assessment note.
+Generate a concise triage SOAP note. In the Plan section include the disposition level (Routine / Urgent / Emergent) and referral destination.
+Use military behavioral health terminology.
+Be professional, objective, and clinically precise.
+Format the response exactly as:
+SUBJECTIVE:
+[content]
+
+OBJECTIVE:
+[content]
+
+ASSESSMENT:
+[content]
+
+PLAN:
+[content — include Disposition Level and Referral]`
+  } else {
+    base = `You are a clinical documentation assistant for a behavioral health RBT/clinician.
 Generate clinical notes in standard SOAP format for civilian behavioral health practice.
 Be professional, objective, and clinically precise.
 Format the response exactly as:
@@ -241,22 +261,25 @@ ASSESSMENT:
 
 PLAN:
 [content]`
-
+  }
   return customPrompt ? `${base}\n\nAdditional instructions: ${customPrompt}` : base
 }
 
-function buildNoteUserMessage(transcription, clientInfo) {
+function buildNoteUserMessage(transcription, clientInfo, clinicianNotes = '') {
+  const notesSection = clinicianNotes
+    ? `\nClinician Notes (supplementary clinical observations):\n---\n${clinicianNotes}\n---\n`
+    : ''
   return `Client ID: ${clientInfo.client_id_number}
 Mode: ${clientInfo.mode?.toUpperCase()}
 Diagnosis: ${clientInfo.diagnosis || 'Not specified'}
-${clientInfo.mode === 'army' ? `Rank/Unit: ${clientInfo.rank || 'N/A'} / ${clientInfo.unit || 'N/A'}` : ''}
+${clientInfo.mode === 'army' || clientInfo.mode === 'triage' ? `Rank/Unit: ${clientInfo.rank || 'N/A'} / ${clientInfo.unit || 'N/A'}` : ''}
 
 Session Transcription:
 ---
-${transcription}
+${transcription || 'No audio transcription available.'}
 ---
-
-Please generate a complete SOAP note based on this session transcription.`
+${notesSection}
+Please generate a complete SOAP note based on the available session content.`
 }
 
 function buildStaffingSystemPrompt(mode, customPrompt) {
