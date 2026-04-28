@@ -336,13 +336,14 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
               <AudioRecorder onRecordingComplete={setAudioBlob} />
             )}
 
-            {/* Horizontal split: Guide (left) + Scratchpad (right) */}
+            {/* Split: Guide compact left, Scratchpad fills the rest */}
             <div className="flex flex-col md:flex-row gap-3">
-              <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ width: '100%', maxWidth: 220, flexShrink: 0 }}>
                 {mode === 'triage' ? <TriageGuide /> : <IntakeGuide />}
               </div>
-              <div style={{ width: '100%', maxWidth: 230, flexShrink: 0 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <ClinicianScratchpad
+                  large
                   onSave={data => setScratchpadData(data)}
                   onTextChange={text => setScratchpadData(d => ({ ...d, text }))}
                 />

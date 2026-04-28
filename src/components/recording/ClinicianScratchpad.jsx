@@ -37,7 +37,7 @@ async function visionTranscribe(base64, apiKey) {
   return data.choices[0].message.content
 }
 
-export function ClinicianScratchpad({ onSave, onTextChange }) {
+export function ClinicianScratchpad({ onSave, onTextChange, large = false }) {
   const [mode, setMode]         = useState('keyboard')
   const [text, setText]         = useState('')
   const [penColor, setPenColor] = useState(COLORS[0].value)
@@ -150,6 +150,10 @@ export function ClinicianScratchpad({ onSave, onTextChange }) {
 
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0
 
+  const textareaMinH = large ? 420 : 180
+  const canvasMinH   = large ? 380 : 160
+  const containerMinH = large ? 480 : 280
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
@@ -157,7 +161,7 @@ export function ClinicianScratchpad({ onSave, onTextChange }) {
       borderRadius: 2,
       background: 'var(--cm-surface)',
       overflow: 'hidden',
-      minHeight: 280,
+      minHeight: containerMinH,
     }}>
       {/* Header */}
       <div style={{
@@ -207,11 +211,11 @@ export function ClinicianScratchpad({ onSave, onTextChange }) {
             onChange={e => handleTextChange(e.target.value)}
             placeholder="Type session notes here..."
             style={{
-              flex: 1, width: '100%', padding: '8px 10px',
+              flex: 1, width: '100%', padding: '10px 12px',
               resize: 'none', background: 'transparent', border: 'none', outline: 'none',
-              fontSize: 12, color: 'var(--cm-ink-soft)', lineHeight: 1.5,
+              fontSize: large ? 14 : 12, color: 'var(--cm-ink-soft)', lineHeight: 1.6,
               fontFamily: 'Inter, system-ui, sans-serif',
-              minHeight: 180,
+              minHeight: textareaMinH,
             }}
           />
         ) : (
@@ -277,7 +281,7 @@ export function ClinicianScratchpad({ onSave, onTextChange }) {
                 touchAction: 'none',
                 cursor: tool === 'eraser' ? 'cell' : 'crosshair',
                 background: CANVAS_BG,
-                minHeight: 160,
+                minHeight: canvasMinH,
               }}
             />
           </div>
