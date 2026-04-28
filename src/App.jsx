@@ -3,6 +3,7 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import { ThemeProvider } from './hooks/useTheme'
 import { FullPageLoader } from './components/ui/LoadingSpinner'
+import { UpdatePrompt } from './components/ui/UpdatePrompt'
 
 // Pages
 import Login from './pages/Login'
@@ -63,6 +64,7 @@ export default function App() {
       <BrowserRouter>
         <AuthProvider>
           <AppRoutes />
+          <UpdatePrompt />
           <Toaster
             position="top-right"
             toastOptions={{
