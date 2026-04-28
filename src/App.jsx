@@ -18,6 +18,7 @@ import DSMReference from './pages/DSMReference'
 import Settings from './pages/Settings'
 import ResetPassword from './pages/ResetPassword'
 import GroupSessions from './pages/GroupSessions'
+import NewSession from './pages/NewSession'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -43,6 +44,7 @@ function AppRoutes() {
       <Route path="/clients"        element={<ProtectedRoute><Clients /></ProtectedRoute>} />
       <Route path="/clients/:id"    element={<ProtectedRoute><ClientDetail /></ProtectedRoute>} />
       <Route path="/sessions"       element={<ProtectedRoute><Sessions /></ProtectedRoute>} />
+      <Route path="/sessions/new"   element={<ProtectedRoute><NewSession /></ProtectedRoute>} />
       <Route path="/sessions/:id"   element={<ProtectedRoute><SessionDetail /></ProtectedRoute>} />
       <Route path="/safety"         element={<ProtectedRoute><SafetyPlans /></ProtectedRoute>} />
       <Route path="/staffing"       element={<ProtectedRoute><Staffing /></ProtectedRoute>} />

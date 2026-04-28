@@ -1,29 +1,26 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Mic, Plus, Calendar, ChevronRight, Shield, Stethoscope, Trash2
 } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { Button } from '../components/ui/Button'
-import { Modal, ConfirmModal } from '../components/ui/Modal'
+import { ConfirmModal } from '../components/ui/Modal'
 import { SearchInput } from '../components/ui/SearchInput'
 import { ModeBadge } from '../components/ui/Badge'
 import { EmptyState } from '../components/ui/EmptyState'
 import { PageLoader } from '../components/ui/LoadingSpinner'
-import { NewSessionWizard } from '../components/recording/NewSessionWizard'
 import { useAuth } from '../hooks/useAuth'
 import { getSessions, deleteSession } from '../utils/supabase'
 import toast from 'react-hot-toast'
 
 export default function Sessions() {
   const { user } = useAuth()
-  const [searchParams] = useSearchParams()
-  const preselectedClient = searchParams.get('client')
+  const navigate = useNavigate()
 
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [showWizard, setShowWizard] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -41,7 +38,6 @@ export default function Sessions() {
 
   useEffect(() => {
     fetchSessions()
-    if (preselectedClient) setShowWizard(true)
   }, [user])
 
   const filtered = sessions.filter(s =>
@@ -64,17 +60,11 @@ export default function Sessions() {
     }
   }
 
-  const handleSessionCreated = (newSession) => {
-    setShowWizard(false)
-    fetchSessions()
-    toast.success('Session note saved')
-  }
-
   return (
     <Layout
       title="Sessions"
       headerActions={
-        <Button variant="primary" size="sm" icon={Plus} onClick={() => setShowWizard(true)}>
+        <Button variant="primary" size="sm" icon={Plus} onClick={() => navigate('/sessions/new')}>
           New Session
         </Button>
       }
@@ -93,7 +83,7 @@ export default function Sessions() {
           icon={Mic}
           title={search ? 'No sessions found' : 'No sessions yet'}
           description="Record a session to generate AI-assisted SOAP notes."
-          action={() => setShowWizard(true)}
+          action={() => navigate('/sessions/new')}
           actionLabel="New Session"
           actionIcon={Plus}
         />
@@ -143,21 +133,6 @@ export default function Sessions() {
           ))}
         </div>
       )}
-
-      {/* New Session Wizard Modal */}
-      <Modal
-        isOpen={showWizard}
-        onClose={() => setShowWizard(false)}
-        title="New Session"
-        size="lg"
-        className="!max-h-[95dvh]"
-      >
-        <NewSessionWizard
-          preselectedClientId={preselectedClient}
-          onComplete={handleSessionCreated}
-          onCancel={() => setShowWizard(false)}
-        />
-      </Modal>
 
       {/* Delete confirm */}
       <ConfirmModal

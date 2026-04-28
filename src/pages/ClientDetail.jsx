@@ -4,9 +4,7 @@ import { ArrowLeft, Plus, Calendar, ChevronRight, Mic } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { Button } from '../components/ui/Button'
 import { ModeBadge } from '../components/ui/Badge'
-import { Modal } from '../components/ui/Modal'
 import { PageLoader } from '../components/ui/LoadingSpinner'
-import { NewSessionWizard } from '../components/recording/NewSessionWizard'
 import { getClient, getSessions } from '../utils/supabase'
 import toast from 'react-hot-toast'
 
@@ -16,7 +14,6 @@ export default function ClientDetail() {
   const [client, setClient] = useState(null)
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showWizard, setShowWizard] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -37,12 +34,6 @@ export default function ClientDetail() {
     load()
   }, [id, navigate])
 
-  const handleSessionCreated = (newSession) => {
-    setShowWizard(false)
-    setSessions(prev => [newSession, ...prev])
-    toast.success('Session note saved')
-  }
-
   if (loading) return <Layout><PageLoader /></Layout>
   if (!client) return null
 
@@ -55,7 +46,7 @@ export default function ClientDetail() {
       }
       title={client.name}
       headerActions={
-        <Button variant="primary" size="sm" icon={Mic} onClick={() => setShowWizard(true)}>
+        <Button variant="primary" size="sm" icon={Mic} onClick={() => navigate(`/sessions/new?client=${id}`)}>
           New Session
         </Button>
       }
@@ -74,7 +65,7 @@ export default function ClientDetail() {
         <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
           Sessions ({sessions.length})
         </h3>
-        <Button variant="ghost" size="xs" icon={Plus} onClick={() => setShowWizard(true)}>
+        <Button variant="ghost" size="xs" icon={Plus} onClick={() => navigate(`/sessions/new?client=${id}`)}>
           New
         </Button>
       </div>
@@ -83,7 +74,7 @@ export default function ClientDetail() {
         <div className="card p-8 text-center space-y-3">
           <Mic className="w-8 h-8 text-text-muted mx-auto opacity-40" />
           <p className="text-sm text-text-muted">No sessions yet.</p>
-          <Button variant="primary" size="sm" icon={Plus} onClick={() => setShowWizard(true)}>
+          <Button variant="primary" size="sm" icon={Plus} onClick={() => navigate(`/sessions/new?client=${id}`)}>
             Record First Session
           </Button>
         </div>
@@ -114,20 +105,6 @@ export default function ClientDetail() {
         </div>
       )}
 
-      {/* New Session modal */}
-      <Modal
-        isOpen={showWizard}
-        onClose={() => setShowWizard(false)}
-        title="New Session"
-        size="lg"
-        className="!max-h-[95dvh]"
-      >
-        <NewSessionWizard
-          preselectedClientId={id}
-          onComplete={handleSessionCreated}
-          onCancel={() => setShowWizard(false)}
-        />
-      </Modal>
     </Layout>
   )
 }
