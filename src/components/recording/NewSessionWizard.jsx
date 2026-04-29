@@ -194,27 +194,15 @@ function GuideAccordion({ mode }) {
               <ChevronLeft style={{ width: 14, height: 14 }} /> Prev
             </button>
 
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
-              {steps.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setSectionIdx(i)}
-                  style={{
-                    width: i === sectionIdx ? 18 : 8, height: 8, borderRadius: 4,
-                    border: 'none', cursor: 'pointer',
-                    padding: 0, minHeight: 44, minWidth: 24,
-                    background: 'transparent',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    WebkitTapHighlightColor: 'transparent',
-                  }}
-                >
-                  <div style={{
-                    width: i === sectionIdx ? 18 : 8, height: 8, borderRadius: 4,
-                    background: i <= sectionIdx ? accent : 'var(--cm-line)',
-                    transition: 'all 0.15s',
-                  }} />
-                </button>
-              ))}
+            <div style={{
+              flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center',
+            }}>
+              <span style={{
+                fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 700,
+                color: accent, letterSpacing: '0.1em',
+              }}>
+                {sectionIdx + 1} / {steps.length}
+              </span>
             </div>
 
             <button
