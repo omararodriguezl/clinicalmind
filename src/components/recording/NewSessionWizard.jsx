@@ -175,34 +175,45 @@ function GuideAccordion({ mode }) {
           </ol>
 
           <div style={{
-            display: 'flex', alignItems: 'center', paddingTop: 10,
+            display: 'flex', alignItems: 'center', paddingTop: 8,
             borderTop: `1px solid ${accent}30`, marginTop: 4,
           }}>
             <button
               onClick={() => setSectionIdx(s => Math.max(0, s - 1))}
               disabled={sectionIdx === 0}
               style={{
-                display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none',
+                display: 'flex', alignItems: 'center', gap: 4,
+                background: 'none', border: 'none',
                 cursor: sectionIdx === 0 ? 'default' : 'pointer',
-                fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: accent,
-                opacity: sectionIdx === 0 ? 0.3 : 1, fontWeight: 600, padding: 0,
+                fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: accent,
+                opacity: sectionIdx === 0 ? 0.3 : 1, fontWeight: 700,
+                padding: '10px 12px', minHeight: 44,
+                WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <ChevronLeft style={{ width: 12, height: 12 }} /> Prev
+              <ChevronLeft style={{ width: 14, height: 14 }} /> Prev
             </button>
 
-            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: 5 }}>
+            <div style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
               {steps.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => setSectionIdx(i)}
                   style={{
-                    width: i === sectionIdx ? 16 : 6, height: 6, borderRadius: 3,
-                    border: 'none', cursor: 'pointer', padding: 0,
+                    width: i === sectionIdx ? 18 : 8, height: 8, borderRadius: 4,
+                    border: 'none', cursor: 'pointer',
+                    padding: 0, minHeight: 44, minWidth: 24,
+                    background: 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  <div style={{
+                    width: i === sectionIdx ? 18 : 8, height: 8, borderRadius: 4,
                     background: i <= sectionIdx ? accent : 'var(--cm-line)',
                     transition: 'all 0.15s',
-                  }}
-                />
+                  }} />
+                </button>
               ))}
             </div>
 
@@ -210,13 +221,16 @@ function GuideAccordion({ mode }) {
               onClick={() => setSectionIdx(s => Math.min(steps.length - 1, s + 1))}
               disabled={sectionIdx === steps.length - 1}
               style={{
-                display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none',
+                display: 'flex', alignItems: 'center', gap: 4,
+                background: 'none', border: 'none',
                 cursor: sectionIdx === steps.length - 1 ? 'default' : 'pointer',
-                fontFamily: 'JetBrains Mono, monospace', fontSize: 11, color: accent,
-                opacity: sectionIdx === steps.length - 1 ? 0.3 : 1, fontWeight: 600, padding: 0,
+                fontFamily: 'JetBrains Mono, monospace', fontSize: 12, color: accent,
+                opacity: sectionIdx === steps.length - 1 ? 0.3 : 1, fontWeight: 700,
+                padding: '10px 12px', minHeight: 44,
+                WebkitTapHighlightColor: 'transparent',
               }}
             >
-              Next <ChevronRight style={{ width: 12, height: 12 }} />
+              Next <ChevronRight style={{ width: 14, height: 14 }} />
             </button>
           </div>
         </div>

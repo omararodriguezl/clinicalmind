@@ -104,9 +104,10 @@ export default function GroupSessions() {
   const [tab, setTab] = useState('generator')
 
   // Generator form
-  const [topic, setTopic]       = useState('')
+  const [topic, setTopic]         = useState('')
   const [groupType, setGroupType] = useState(null)
-  const [duration, setDuration] = useState(60)
+  const [duration, setDuration]   = useState(60)
+  const [durationStr, setDurationStr] = useState('60')
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState(null)
 
@@ -290,8 +291,14 @@ export default function GroupSessions() {
                 <div className="flex items-center gap-3">
                   <input
                     type="number"
-                    value={duration}
-                    onChange={e => setDuration(Math.min(120, Math.max(15, Number(e.target.value))))}
+                    inputMode="numeric"
+                    value={durationStr}
+                    onChange={e => setDurationStr(e.target.value)}
+                    onBlur={() => {
+                      const n = Math.min(120, Math.max(15, parseInt(durationStr, 10) || 60))
+                      setDuration(n)
+                      setDurationStr(String(n))
+                    }}
                     min={15}
                     max={120}
                     className="input-base w-24 text-center"
