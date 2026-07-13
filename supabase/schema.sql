@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS public.sessions (
   id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   client_id UUID REFERENCES public.clients(id) ON DELETE CASCADE NOT NULL,
-  mode TEXT NOT NULL CHECK (mode IN ('army', 'civilian')),
+  mode TEXT NOT NULL CHECK (mode IN ('army', 'civilian', 'triage')),
   session_date TIMESTAMPTZ DEFAULT NOW(),
   transcription TEXT,
   soap_subjective TEXT,

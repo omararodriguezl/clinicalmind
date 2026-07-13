@@ -305,6 +305,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
   const [followUpAudioBlob, setFollowUpAudioBlob] = useState(null)
   const [followUpTranscription, setFollowUpTranscription] = useState('')
   const [transcribingFollowUp, setTranscribingFollowUp] = useState(false)
+  const [followUpNotes, setFollowUpNotes] = useState({ text: '', image: null })
 
   const [soapNote, setSoapNote] = useState(null)
   const [processing, setProcessing] = useState(false)
@@ -406,10 +407,12 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
       setProcessing(true)
       setProcessingMsg('Generating SOAP note with GPT-4...')
       try {
-        const combined = followUpTranscription
-          ? `[INITIAL SESSION]\n${transcription}\n\n[FOLLOW-UP]\n${followUpTranscription}`
-          : transcription
-        const note = await generateNote(combined, mode, selectedClient, null, apiKey, scratchpadData.text)
+        const parts = [transcription]
+        if (followUpTranscription) parts.push(`[FOLLOW-UP RECORDING]\n${followUpTranscription}`)
+        if (followUpNotes.text) parts.push(`[FOLLOW-UP NOTES]\n${followUpNotes.text}`)
+        const combined = parts.join('\n\n')
+        const allNotes = [scratchpadData.text, followUpNotes.text].filter(Boolean).join('\n\n')
+        const note = await generateNote(combined, mode, selectedClient, null, apiKey, allNotes)
         setSoapNote(note)
         setStep(4)
       } catch (err) {
@@ -444,6 +447,13 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
           content: scratchpadData.text || '',
           canvas_image: scratchpadData.image || null,
         }).catch(err => console.warn('clinician_notes save failed:', err.message))
+      }
+      if (followUpNotes.text || followUpNotes.image) {
+        saveClinicianNote({
+          session_id: session.id,
+          content: followUpNotes.text ? `[FOLLOW-UP]\n${followUpNotes.text}` : '',
+          canvas_image: followUpNotes.image || null,
+        }).catch(err => console.warn('follow-up notes save failed:', err.message))
       }
       onComplete(session)
     } catch (err) {
@@ -881,10 +891,24 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
               )}
             </div>
 
+            {/* Follow-up clinician notes (text + Apple Pencil) */}
+            <div style={{ marginTop: 4 }}>
+              <div style={{
+                fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, fontWeight: 700,
+                color: 'var(--cm-ink-mute)', letterSpacing: '0.22em', textTransform: 'uppercase',
+                marginBottom: 8,
+              }}>ADD NOTES · KEYBOARD OR PENCIL</div>
+              <ClinicianScratchpad
+                large
+                onSave={data => setFollowUpNotes(data)}
+                onTextChange={text => setFollowUpNotes(d => ({ ...d, text }))}
+              />
+            </div>
+
             <p style={{ fontSize: 11.5, color: 'var(--cm-ink-faint)', margin: 0 }}>
-              {followUpTranscription
-                ? 'Both recordings will be combined for a more complete SOAP note.'
-                : 'You can skip follow-up recording and proceed directly to the SOAP note.'}
+              {followUpTranscription || followUpNotes.text
+                ? 'All follow-up content will be combined for a more complete SOAP note.'
+                : 'You can skip follow-up and proceed directly to the SOAP note.'}
             </p>
           </div>
         )}
