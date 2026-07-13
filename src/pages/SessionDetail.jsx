@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Download, FileText, Edit3, Check, X, Shield, Stethoscope, Lightbulb } from 'lucide-react'
+import { ArrowLeft, Download, FileText, Edit3, Check, X, Shield, Stethoscope, Lightbulb, AlertTriangle, PenLine, MessageSquare } from 'lucide-react'
 import { Layout } from '../components/layout/Layout'
 import { Button } from '../components/ui/Button'
 import { ModeBadge } from '../components/ui/Badge'
 import { PageLoader } from '../components/ui/LoadingSpinner'
-import { getSession, updateSession } from '../utils/supabase'
+import { getSession, updateSession, getClinicianNotes } from '../utils/supabase'
 import { generateSOAPNotePDF, exportAsTXT, formatSOAPAsTXT } from '../utils/pdfGenerator'
 import toast from 'react-hot-toast'
 
@@ -41,12 +41,17 @@ export default function SessionDetail() {
   const [editing, setEditing] = useState(false)
   const [editData, setEditData] = useState({})
   const [saving, setSaving] = useState(false)
-  const [showTranscription, setShowTranscription] = useState(false)
+  const [showTranscription, setShowTranscription] = useState(true)
+  const [clinicianNotes, setClinicianNotes] = useState([])
 
   useEffect(() => {
-    getSession(id)
-      .then(data => {
+    Promise.all([
+      getSession(id),
+      getClinicianNotes(id),
+    ])
+      .then(([data, notes]) => {
         setSession(data)
+        setClinicianNotes(notes || [])
         setEditData({
           soap_subjective: data.soap_subjective,
           soap_objective: data.soap_objective,
@@ -115,10 +120,10 @@ export default function SessionDetail() {
       }
     >
       {/* Header info */}
-      <div className={`rounded-xl border p-4 mb-5 ${session.mode === 'army' ? 'bg-army-bg border-army-border' : 'bg-civilian-bg border-civilian-border'}`}>
+      <div className={`rounded-xl border p-4 mb-5 ${session.mode === 'army' ? 'bg-army-bg border-army-border' : session.mode === 'triage' ? 'bg-warn-bg border-warn-border' : 'bg-civilian-bg border-civilian-border'}`}>
         <div className="flex items-center gap-3">
-          <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${session.mode === 'army' ? 'bg-army-muted' : 'bg-civilian-muted'}`}>
-            {session.mode === 'army' ? <Shield className="w-4 h-4 text-army-text" /> : <Stethoscope className="w-4 h-4 text-civilian-text" />}
+          <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${session.mode === 'army' ? 'bg-army-muted' : session.mode === 'triage' ? 'bg-warn-muted' : 'bg-civilian-muted'}`}>
+            {session.mode === 'army' ? <Shield className="w-4 h-4 text-army-text" /> : session.mode === 'triage' ? <AlertTriangle className="w-4 h-4" style={{ color: 'var(--cm-warn)' }} /> : <Stethoscope className="w-4 h-4 text-civilian-text" />}
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -166,18 +171,116 @@ export default function SessionDetail() {
         </div>
       )}
 
-      {/* Transcription (collapsible) */}
+      {/* Clinician Notes (session + follow-up) */}
+      {clinicianNotes.length > 0 && (() => {
+        const sessionNotes = clinicianNotes.filter(n => !n.content?.startsWith('[FOLLOW-UP]'))
+        const followUpNotes = clinicianNotes.filter(n => n.content?.startsWith('[FOLLOW-UP]'))
+        return (
+          <>
+            {sessionNotes.map((note, i) => (note.content || note.canvas_image) && (
+              <div key={note.id || i} style={{
+                marginTop: 20, border: '1px solid var(--cm-line)',
+                borderLeft: '3px solid var(--cm-od)', borderRadius: 8, overflow: 'hidden',
+              }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 14px', background: 'var(--cm-surface-alt)',
+                  borderBottom: '1px solid var(--cm-line)',
+                }}>
+                  <PenLine style={{ width: 13, height: 13, color: 'var(--cm-od)' }} />
+                  <span style={{
+                    fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, fontWeight: 700,
+                    color: 'var(--cm-od)', letterSpacing: '0.18em', textTransform: 'uppercase',
+                  }}>Session Notes</span>
+                </div>
+                {note.content && (
+                  <div style={{ padding: '12px 14px' }}>
+                    <p style={{
+                      fontSize: 13, color: 'var(--cm-ink-soft)', lineHeight: 1.6,
+                      whiteSpace: 'pre-wrap', margin: 0,
+                    }}>{note.content}</p>
+                  </div>
+                )}
+                {note.canvas_image && (
+                  <div style={{ padding: '0 14px 12px' }}>
+                    <img
+                      src={note.canvas_image}
+                      alt="Handwritten notes"
+                      style={{ width: '100%', borderRadius: 6, border: '1px solid var(--cm-line)' }}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {followUpNotes.map((note, i) => (note.content || note.canvas_image) && (
+              <div key={note.id || i} style={{
+                marginTop: 16, border: '1px solid var(--cm-line)',
+                borderLeft: '3px solid var(--cm-warn)', borderRadius: 8, overflow: 'hidden',
+              }}>
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '8px 14px', background: 'var(--cm-surface-alt)',
+                  borderBottom: '1px solid var(--cm-line)',
+                }}>
+                  <MessageSquare style={{ width: 13, height: 13, color: 'var(--cm-warn)' }} />
+                  <span style={{
+                    fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, fontWeight: 700,
+                    color: 'var(--cm-warn)', letterSpacing: '0.18em', textTransform: 'uppercase',
+                  }}>Follow-up Notes</span>
+                </div>
+                {note.content && (
+                  <div style={{ padding: '12px 14px' }}>
+                    <p style={{
+                      fontSize: 13, color: 'var(--cm-ink-soft)', lineHeight: 1.6,
+                      whiteSpace: 'pre-wrap', margin: 0,
+                    }}>
+                      {note.content.replace(/^\[FOLLOW-UP\]\n?/, '')}
+                    </p>
+                  </div>
+                )}
+                {note.canvas_image && (
+                  <div style={{ padding: '0 14px 12px' }}>
+                    <img
+                      src={note.canvas_image}
+                      alt="Handwritten follow-up notes"
+                      style={{ width: '100%', borderRadius: 6, border: '1px solid var(--cm-line)' }}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </>
+        )
+      })()}
+
+      {/* Transcription */}
       {session.transcription && (
-        <div className="mt-5">
+        <div style={{ marginTop: 20 }}>
           <button
             onClick={() => setShowTranscription(v => !v)}
-            className="text-xs text-primary hover:underline flex items-center gap-1"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 12, fontWeight: 600, color: 'var(--cm-od)',
+              fontFamily: 'Inter, system-ui, sans-serif',
+            }}
           >
-            {showTranscription ? 'Hide' : 'Show'} original transcription
+            <span>{showTranscription ? '▾' : '▸'}</span>
+            {showTranscription ? 'Hide' : 'Show'} session transcription
           </button>
           {showTranscription && (
-            <div className="mt-2 card-2 p-4 max-h-40 overflow-y-auto">
-              <p className="text-xs text-text-muted leading-relaxed whitespace-pre-wrap">{session.transcription}</p>
+            <div style={{
+              marginTop: 8, padding: '14px 16px',
+              background: 'var(--cm-surface)', border: '1px solid var(--cm-line)',
+              borderLeft: '3px solid var(--cm-line)', borderRadius: 8,
+              maxHeight: 320, overflowY: 'auto',
+            }}>
+              <p style={{
+                fontSize: 12.5, color: 'var(--cm-ink-soft)', lineHeight: 1.65,
+                whiteSpace: 'pre-wrap', margin: 0,
+                fontFamily: 'JetBrains Mono, monospace',
+              }}>{session.transcription}</p>
             </div>
           )}
         </div>
