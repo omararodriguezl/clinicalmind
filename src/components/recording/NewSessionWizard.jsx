@@ -433,7 +433,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
       const session = await createSession({
         user_id: user.id,
         client_id: selectedClient.id,
-        mode,
+        mode: mode === 'triage' ? (selectedClient.mode || 'army') : mode,
         session_date: new Date().toISOString(),
         transcription: followUpTranscription
           ? `[INITIAL]\n${transcription}\n\n[FOLLOW-UP]\n${followUpTranscription}`
@@ -451,7 +451,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
       if (followUpNotes.text || followUpNotes.image) {
         saveClinicianNote({
           session_id: session.id,
-          content: followUpNotes.text ? `[FOLLOW-UP]\n${followUpNotes.text}` : '',
+          content: `[FOLLOW-UP]\n${followUpNotes.text || ''}`,
           canvas_image: followUpNotes.image || null,
         }).catch(err => console.warn('follow-up notes save failed:', err.message))
       }
@@ -902,6 +902,7 @@ export function NewSessionWizard({ preselectedClientId, onComplete, onCancel }) 
                 large
                 onSave={data => setFollowUpNotes(data)}
                 onTextChange={text => setFollowUpNotes(d => ({ ...d, text }))}
+                onImageChange={img => setFollowUpNotes(d => ({ ...d, image: img }))}
               />
             </div>
 

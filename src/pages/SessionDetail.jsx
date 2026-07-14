@@ -193,7 +193,7 @@ export default function SessionDetail() {
                     color: 'var(--cm-od)', letterSpacing: '0.18em', textTransform: 'uppercase',
                   }}>Session Notes</span>
                 </div>
-                {note.content && (
+                {!!note.content?.trim() && (
                   <div style={{ padding: '12px 14px' }}>
                     <p style={{
                       fontSize: 13, color: 'var(--cm-ink-soft)', lineHeight: 1.6,
@@ -202,7 +202,7 @@ export default function SessionDetail() {
                   </div>
                 )}
                 {note.canvas_image && (
-                  <div style={{ padding: '0 14px 12px' }}>
+                  <div style={{ padding: note.content?.trim() ? '0 14px 12px' : '12px 14px' }}>
                     <img
                       src={note.canvas_image}
                       alt="Handwritten notes"
@@ -213,43 +213,44 @@ export default function SessionDetail() {
               </div>
             ))}
 
-            {followUpNotes.map((note, i) => (note.content || note.canvas_image) && (
-              <div key={note.id || i} style={{
-                marginTop: 16, border: '1px solid var(--cm-line)',
-                borderLeft: '3px solid var(--cm-warn)', borderRadius: 8, overflow: 'hidden',
-              }}>
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '8px 14px', background: 'var(--cm-surface-alt)',
-                  borderBottom: '1px solid var(--cm-line)',
+            {followUpNotes.map((note, i) => {
+              const strippedText = note.content?.replace(/^\[FOLLOW-UP\]\n?/, '') || ''
+              return (note.canvas_image || strippedText) ? (
+                <div key={note.id || i} style={{
+                  marginTop: 16, border: '1px solid var(--cm-line)',
+                  borderLeft: '3px solid var(--cm-warn)', borderRadius: 8, overflow: 'hidden',
                 }}>
-                  <MessageSquare style={{ width: 13, height: 13, color: 'var(--cm-warn)' }} />
-                  <span style={{
-                    fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, fontWeight: 700,
-                    color: 'var(--cm-warn)', letterSpacing: '0.18em', textTransform: 'uppercase',
-                  }}>Follow-up Notes</span>
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '8px 14px', background: 'var(--cm-surface-alt)',
+                    borderBottom: '1px solid var(--cm-line)',
+                  }}>
+                    <MessageSquare style={{ width: 13, height: 13, color: 'var(--cm-warn)' }} />
+                    <span style={{
+                      fontFamily: 'JetBrains Mono, monospace', fontSize: 9.5, fontWeight: 700,
+                      color: 'var(--cm-warn)', letterSpacing: '0.18em', textTransform: 'uppercase',
+                    }}>Follow-up Notes</span>
+                  </div>
+                  {!!strippedText && (
+                    <div style={{ padding: '12px 14px' }}>
+                      <p style={{
+                        fontSize: 13, color: 'var(--cm-ink-soft)', lineHeight: 1.6,
+                        whiteSpace: 'pre-wrap', margin: 0,
+                      }}>{strippedText}</p>
+                    </div>
+                  )}
+                  {note.canvas_image && (
+                    <div style={{ padding: strippedText ? '0 14px 12px' : '12px 14px' }}>
+                      <img
+                        src={note.canvas_image}
+                        alt="Handwritten follow-up notes"
+                        style={{ width: '100%', borderRadius: 6, border: '1px solid var(--cm-line)' }}
+                      />
+                    </div>
+                  )}
                 </div>
-                {note.content && (
-                  <div style={{ padding: '12px 14px' }}>
-                    <p style={{
-                      fontSize: 13, color: 'var(--cm-ink-soft)', lineHeight: 1.6,
-                      whiteSpace: 'pre-wrap', margin: 0,
-                    }}>
-                      {note.content.replace(/^\[FOLLOW-UP\]\n?/, '')}
-                    </p>
-                  </div>
-                )}
-                {note.canvas_image && (
-                  <div style={{ padding: '0 14px 12px' }}>
-                    <img
-                      src={note.canvas_image}
-                      alt="Handwritten follow-up notes"
-                      style={{ width: '100%', borderRadius: 6, border: '1px solid var(--cm-line)' }}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
+              ) : null
+            })}
           </>
         )
       })()}

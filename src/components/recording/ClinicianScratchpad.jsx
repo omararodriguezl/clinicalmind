@@ -37,7 +37,7 @@ async function visionTranscribe(base64, apiKey) {
   return data.choices[0].message.content
 }
 
-export function ClinicianScratchpad({ onSave, onTextChange, large = false }) {
+export function ClinicianScratchpad({ onSave, onTextChange, onImageChange, large = false }) {
   const [mode, setMode]         = useState('keyboard')
   const [text, setText]         = useState('')
   const [penColor, setPenColor] = useState(COLORS[0].value)
@@ -108,7 +108,10 @@ export function ClinicianScratchpad({ onSave, onTextChange, large = false }) {
   const onPointerUp = useCallback(() => {
     isDrawing.current = false
     lastPos.current = null
-  }, [])
+    if (onImageChange && canvasRef.current) {
+      onImageChange(canvasRef.current.toDataURL('image/png'))
+    }
+  }, [onImageChange])
 
   const clearCanvas = () => {
     const canvas = canvasRef.current
